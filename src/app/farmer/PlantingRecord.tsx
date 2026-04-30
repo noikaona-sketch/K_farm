@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { db, isSupabaseEnabled } from '../../lib/supabase'
 import { Upload, User, Crown, Check, MapPin, Clock, FileText, ClipboardList, Camera, RefreshCw, AlertCircle, Sprout, Leaf, TrendingUp, ShoppingCart, Truck, ChevronLeft } from 'lucide-react'
 import { useAuth } from '../../routes/AuthContext'
 import { MOCK_PLANTING_RECORDS, MOCK_SALE_HISTORY, MOCK_NO_BURN, MOCK_FARMS } from '../../data/mockData'

@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { db, isSupabaseEnabled } from '../../lib/supabase'
 import { ChevronLeft, Camera, FileText, User, Check, AlertCircle, MapPin, RefreshCw, ImagePlus } from 'lucide-react'
 
 // Read GPS from EXIF
