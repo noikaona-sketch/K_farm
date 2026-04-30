@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Upload, User, Crown, Check, MapPin, Clock, FileText, ClipboardList, Camera, RefreshCw, AlertCircle, Sprout, Leaf, TrendingUp, ShoppingCart, Truck, ChevronLeft } from 'lucide-react'
 import { useAuth } from '../../routes/AuthContext'
 import { MOCK_PLANTING_RECORDS, MOCK_SALE_HISTORY, MOCK_NO_BURN, MOCK_FARMS } from '../../data/mockData'
+import { createNoBurnApplication, createPlantingCycle, createSaleRequest } from '../../lib/dataService'
 import type { PlantPhoto, NoBurnPhoto } from '../../data/mockData'
 
 function readExifCoords(file: File): Promise<{lat:number;lng:number}|null> {
@@ -129,6 +130,8 @@ export default function PlantingRecord() {
   const [addingStep, setAddingStep] = useState<string|null>(null)
   const [showSaleForm, setShowSaleForm] = useState(false)
   const [showNoBurnForm, setShowNoBurnForm] = useState(false)
+  const [submitLoading, setSubmitLoading] = useState(false)
+  const [submitError, setSubmitError] = useState('')
   const [expandedReg, setExpandedReg] = useState<string|null>('nb1')
   const [selectedStage, setSelectedStage] = useState<string|null>(null)
   const [photoPreview, setPhotoPreview] = useState<string|null>(null)
@@ -190,6 +193,7 @@ export default function PlantingRecord() {
       </div>
 
       <div className="p-5 space-y-4">
+        {submitError && <p className="text-sm text-red-600">{submitError}</p>}
 
         {/* ── STATUS TAB ── */}
         {tab==='status' && (<>
@@ -263,7 +267,7 @@ export default function PlantingRecord() {
                   <input placeholder="โรงงาน / สหกรณ์" className="w-full border-2 border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-500"/></div>
                 <div className="flex gap-2">
                   <button onClick={()=>setShowSaleForm(false)} className="flex-1 border-2 border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm font-semibold">ยกเลิก</button>
-                  <button onClick={()=>setShowSaleForm(false)} className="flex-1 bg-emerald-600 text-white py-2.5 rounded-xl text-sm font-bold">✓ บันทึก</button>
+                  <button onClick={async()=>{try{setSubmitLoading(true);setSubmitError('');await createSaleRequest({farmer_id:uid,farm_id:rec?.farmId,status:'pending'});setShowSaleForm(false)}catch{setSubmitError('บันทึกคำขอขายไม่สำเร็จ กรุณาลองใหม่อีกครั้ง')}finally{setSubmitLoading(false)}}} className="flex-1 bg-emerald-600 text-white py-2.5 rounded-xl text-sm font-bold">{submitLoading?'กำลังบันทึก...':'✓ บันทึก'}</button>
                 </div>
               </div>
             )}
@@ -315,7 +319,7 @@ export default function PlantingRecord() {
                       <div><label className="text-sm font-medium text-gray-700 block mb-1.5">น้ำหนักประมาณ (ตัน)</label><input type="number" placeholder="เช่น 10.5" className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500"/></div>
                     </>)}
                     <PhotoCapture label="ถ่ายภาพประกอบ" onCapture={(_d,_lat,_lng)=>{}}/>
-                    <button onClick={()=>{setSelectedStage(null)}} className="w-full bg-emerald-600 text-white rounded-xl py-4 font-bold text-base hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2">
+                    <button onClick={async()=>{try{setSubmitLoading(true);setSubmitError('');await createPlantingCycle({farmer_id:uid,farm_id:rec?.farmId,stage:selectedStage});setSelectedStage(null)}catch{setSubmitError('บันทึกรอบการปลูกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง')}finally{setSubmitLoading(false)}}} className="w-full bg-emerald-600 text-white rounded-xl py-4 font-bold text-base hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2">
                       <Check className="w-5 h-5"/>บันทึก{st.label}
                     </button>
                   </div>
@@ -373,7 +377,7 @@ export default function PlantingRecord() {
               </label>
               <div className="flex gap-3">
                 <button onClick={()=>setShowNoBurnForm(false)} className="flex-1 border-2 border-gray-200 text-gray-600 py-3 rounded-xl font-semibold">ยกเลิก</button>
-                <button onClick={()=>setShowNoBurnForm(false)} className="flex-1 bg-orange-500 text-white py-3 rounded-xl font-bold">ลงทะเบียน</button>
+                <button onClick={async()=>{try{setSubmitLoading(true);setSubmitError('');await createNoBurnApplication({farmer_id:uid,farm_id:rec?.farmId,status:'pending'});setShowNoBurnForm(false)}catch{setSubmitError('ส่งคำขอไม่เผาไม่สำเร็จ กรุณาลองใหม่อีกครั้ง')}finally{setSubmitLoading(false)}}} className="flex-1 bg-orange-500 text-white py-3 rounded-xl font-bold">{submitLoading?'กำลังส่ง...':'ลงทะเบียน'}</button>
               </div>
             </div>
           )}

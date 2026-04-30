@@ -1,9 +1,12 @@
 import React, { useState } from 'react'
+import { createFarm } from '../../lib/dataService'
 import { useNavigate } from 'react-router-dom'
 
 export default function AddFarm() {
   const navigate = useNavigate()
   const [saved, setSaved] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
   const [form, setForm] = useState({ name:'', area:'', soil:'ดินร่วน', water:'น้ำฝน', village:'', district:'', lat:'', lng:'' })
   const u = (k: keyof typeof form, v: string) => setForm(f => ({ ...f, [k]: v }))
 
@@ -53,8 +56,17 @@ export default function AddFarm() {
       <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3">
         <p className="text-xs text-yellow-700">📌 หัวหน้ากลุ่มจะต้องยืนยันแปลงก่อนจึงจะใช้งานได้</p>
       </div>
-      <button onClick={() => setSaved(true)} className="w-full bg-green-600 text-white py-3 rounded-xl font-semibold text-sm shadow-md active:scale-[.98]">
-        ✓ บันทึกแปลง
+      {err && <p className="text-sm text-red-600">{err}</p>}
+      <button disabled={loading} onClick={async () => {
+        try {
+          setLoading(true); setErr('')
+          await createFarm({ name: form.name, area: Number(form.area||0), village: form.village, district: form.district, lat: Number(form.lat||0), lng: Number(form.lng||0), soil_type: form.soil, water_source: form.water, status: 'pending' })
+          setSaved(true)
+        } catch {
+          setErr('บันทึกแปลงไม่สำเร็จ กรุณาลองใหม่อีกครั้ง')
+        } finally { setLoading(false) }
+      }} className="w-full bg-green-600 text-white py-3 rounded-xl font-semibold text-sm shadow-md active:scale-[.98]">
+        {loading ? 'กำลังบันทึก...' : '✓ บันทึกแปลง'}
       </button>
     </div>
   )
