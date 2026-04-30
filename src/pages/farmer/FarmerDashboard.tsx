@@ -1,13 +1,13 @@
 import React from 'react';
 import type { AppPage } from '../../App';
-import { CURRENT_USER, MOCK_FARMS, MOCK_PRICES, MOCK_SALE_REQUESTS, TIER_CONFIG } from '../../data/mockData';
+import { CURRENT_USER, MOCK_FARMS, MOCK_PRICES, MOCK_SALE_REQUESTS_EXTENDED, TIER_CONFIG } from '../../data/mockData';
 
 interface Props { navigate: (p: AppPage) => void; }
 
 export default function FarmerDashboard({ navigate }: Props) {
   const user = CURRENT_USER;
   const myFarms = MOCK_FARMS.filter(f => f.farmerId === user.id);
-  const myRequests = MOCK_SALE_REQUESTS.filter(r => r.farmerId === user.id);
+  const myRequests = MOCK_SALE_REQUESTS_EXTENDED.filter(r => r.farmerId === user.id);
   const tierInfo = TIER_CONFIG[user.tier];
   const latestPrice = MOCK_PRICES.find(p => p.variety === 'อ้อยโรงงาน' && p.grade === 'A');
 

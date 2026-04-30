@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { AppPage } from '../../App';
-import { MOCK_FARMERS, MOCK_FARMS, MOCK_PRICES, MOCK_INSPECTIONS, MOCK_SALE_REQUESTS, TIER_CONFIG } from '../../data/mockData';
+import { MOCK_FARMERS, MOCK_FARMS, MOCK_PRICES, MOCK_INSPECTIONS, MOCK_SALE_REQUESTS_EXTENDED, TIER_CONFIG } from '../../data/mockData';
 
 interface Props { navigate: (p: AppPage) => void; }
 
@@ -9,7 +9,7 @@ export function AdminDashboard({ navigate }: Props) {
     { label: 'เกษตรกรทั้งหมด', value: MOCK_FARMERS.length, icon: '👥', color: 'bg-blue-50 text-blue-700 border-blue-100', sub: 'คน' },
     { label: 'แปลงทั้งหมด', value: MOCK_FARMS.length, icon: '🌾', color: 'bg-green-50 text-green-700 border-green-100', sub: 'แปลง' },
     { label: 'พื้นที่รวม', value: MOCK_FARMS.reduce((s, f) => s + f.area, 0).toFixed(0), icon: '📐', color: 'bg-emerald-50 text-emerald-700 border-emerald-100', sub: 'ไร่' },
-    { label: 'คำขอขาย', value: MOCK_SALE_REQUESTS.length, icon: '🛒', color: 'bg-yellow-50 text-yellow-700 border-yellow-100', sub: 'รายการ' },
+    { label: 'คำขอขาย', value: MOCK_SALE_REQUESTS_EXTENDED.length, icon: '🛒', color: 'bg-yellow-50 text-yellow-700 border-yellow-100', sub: 'รายการ' },
     { label: 'รอตรวจสอบ', value: MOCK_INSPECTIONS.filter(i => i.status === 'pending').length, icon: '🔍', color: 'bg-orange-50 text-orange-700 border-orange-100', sub: 'แปลง' },
     { label: 'ผ่านการตรวจ', value: MOCK_INSPECTIONS.filter(i => i.status === 'completed').length, icon: '✅', color: 'bg-purple-50 text-purple-700 border-purple-100', sub: 'แปลง' },
   ];
@@ -59,7 +59,7 @@ export function AdminDashboard({ navigate }: Props) {
             <button onClick={() => navigate('adminFarmers')} className="text-xs text-green-600">ดูทั้งหมด</button>
           </div>
           <div className="space-y-2">
-            {MOCK_SALE_REQUESTS.map(r => (
+            {MOCK_SALE_REQUESTS_EXTENDED.map(r => (
               <div key={r.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
                 <div>
                   <div className="text-sm font-medium text-gray-800">{r.farmerName}</div>

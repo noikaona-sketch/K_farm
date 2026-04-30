@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import type { AppPage } from '../../App';
-import { MOCK_NO_BURNING, MOCK_SALE_REQUESTS, MOCK_PRICES, TIER_CONFIG, CURRENT_USER } from '../../data/mockData';
+import { MOCK_NO_BURN, MOCK_SALE_REQUESTS_EXTENDED, MOCK_PRICES, TIER_CONFIG, CURRENT_USER } from '../../data/mockData';
 
 interface Props { navigate: (p: AppPage) => void; }
 
 export function NoBurningApplication({ navigate }: Props) {
   const [showForm, setShowForm] = useState(false);
-  const apps = MOCK_NO_BURNING.filter(a => a.farmerId === CURRENT_USER.id);
+  const apps = MOCK_NO_BURN.filter(a => a.farmerId === CURRENT_USER.id);
 
   return (
     <div className="p-4 space-y-4">
@@ -63,7 +63,7 @@ export function NoBurningApplication({ navigate }: Props) {
             <div className="flex justify-between items-start mb-2">
               <div>
                 <div className="font-semibold text-gray-800 text-sm">ฤดูกาลผลิต {a.year}</div>
-                <div className="text-xs text-gray-500">{a.applicationDate}</div>
+                <div className="text-xs text-gray-500">{a.registeredDate}</div>
               </div>
               <span className={`text-xs px-2 py-1 rounded-full font-medium ${
                 a.status === 'approved' ? 'bg-green-100 text-green-700' : a.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
@@ -81,7 +81,7 @@ export function NoBurningApplication({ navigate }: Props) {
 
 export function SaleRequest({ navigate }: Props) {
   const [showForm, setShowForm] = useState(false);
-  const requests = MOCK_SALE_REQUESTS.filter(r => r.farmerId === CURRENT_USER.id);
+  const requests = MOCK_SALE_REQUESTS_EXTENDED.filter(r => r.farmerId === CURRENT_USER.id);
 
   const statusConfig: Record<string, { l: string; c: string }> = {
     pending: { l: '⏳ รออนุมัติ', c: 'bg-yellow-100 text-yellow-700' },
