@@ -1,9 +1,12 @@
 import React, { useState } from 'react'
+import { db, isSupabaseEnabled } from '../../lib/supabase'
 import { useNavigate } from 'react-router-dom'
 
 export default function AddFarm() {
   const navigate = useNavigate()
   const [saved, setSaved] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState('')
   const [form, setForm] = useState({ name:'', area:'', soil:'ดินร่วน', water:'น้ำฝน', village:'', district:'', lat:'', lng:'' })
   const u = (k: keyof typeof form, v: string) => setForm(f => ({ ...f, [k]: v }))
 
@@ -53,9 +56,14 @@ export default function AddFarm() {
       <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3">
         <p className="text-xs text-yellow-700">📌 หัวหน้ากลุ่มจะต้องยืนยันแปลงก่อนจึงจะใช้งานได้</p>
       </div>
-      <button onClick={() => setSaved(true)} className="w-full bg-green-600 text-white py-3 rounded-xl font-semibold text-sm shadow-md active:scale-[.98]">
-        ✓ บันทึกแปลง
+      <button onClick={async () => {
+        setLoading(true); setMessage('กำลังบันทึกข้อมูล...')
+        await db.insert('farms', { ...form, confirmed: false, status: 'pending' })
+        setSaved(true); setLoading(false); setMessage(isSupabaseEnabled ? 'บันทึกลงฐานข้อมูลสำเร็จ' : 'บันทึกแบบ mock (ยังไม่ได้ตั้งค่า env)')
+      }} className="w-full bg-green-600 text-white py-3 rounded-xl font-semibold text-sm shadow-md active:scale-[.98]">
+        {loading ? 'กำลังบันทึก...' : '✓ บันทึกแปลง'}
       </button>
+      {message && <p className="text-sm text-center text-gray-600">{message}</p>}
     </div>
   )
 }
