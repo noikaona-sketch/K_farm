@@ -1,7 +1,7 @@
+@import './styles/theme.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 * { font-family: 'Sarabun', sans-serif; }
-
 body { background-color: #f9fafb; }
