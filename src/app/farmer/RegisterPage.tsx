@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, Camera, FileText, User, Check, AlertCircle, MapPin, RefreshCw, ImagePlus } from 'lucide-react'
+import { registerFarmer } from '../../lib/dataService'
 
 // Read GPS from EXIF
 function readExifCoords(file: File): Promise<{ lat: number; lng: number } | null> {
@@ -66,6 +67,7 @@ export default function RegisterPage() {
   const [ocrLoading, setOcrLoading] = useState(false)
   const [ocrPreview, setOcrPreview] = useState<string|null>(null)
   const [done, setDone] = useState(false)
+  const [submitLoading, setSubmitLoading] = useState(false)
   const [err, setErr] = useState<string|null>(null)
 
   const requestGPS = () => {
@@ -284,9 +286,18 @@ export default function RegisterPage() {
             </button>
           )}
 
-          <button onClick={() => setDone(true)} disabled={!plotFile || !coords}
+          <button onClick={async () => {
+            if (!plotFile || !coords) return
+            try {
+              setSubmitLoading(true); setErr(null)
+              await registerFarmer({ name: form.name || 'ผู้สมัครใหม่', phone: form.phone || '-', idcard: form.idcard || '-', lat: coords.lat, lng: coords.lng })
+              setDone(true)
+            } catch {
+              setErr('ส่งคำขอสมัครไม่สำเร็จ กรุณาลองใหม่อีกครั้ง')
+            } finally { setSubmitLoading(false) }
+          }} disabled={!plotFile || !coords || submitLoading}
             className={`w-full bg-emerald-600 text-white rounded-xl py-4 text-base font-bold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 ${(!plotFile||!coords)?'opacity-50':''}`}>
-            <Check className="w-5 h-5"/>ยืนยันส่งคำขอลงทะเบียน
+            <Check className="w-5 h-5"/>{submitLoading ? 'กำลังส่งข้อมูล...' : 'ยืนยันส่งคำขอลงทะเบียน'}
           </button>
         </div>
       )}
