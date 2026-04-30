@@ -1,101 +1,90 @@
-import React, { useState } from 'react';
-import LoginPage, { type AuthUser, type AppRole } from './pages/auth/LoginPage';
-import FarmerLayout from './components/layout/FarmerLayout';
-import AdminLayout from './components/layout/AdminLayout';
+import React from 'react'
+import { Routes, Route, Navigate } from 'react-router-dom'
+import { AuthProvider, useAuth } from './routes/AuthContext'
 
-import FarmerDashboard from './pages/farmer/FarmerDashboard';
-import RegisterFarmer from './pages/farmer/RegisterFarmer';
-import MyFarms from './pages/farmer/MyFarms';
-import { AddFarm } from './pages/farmer/AddFarm';
-import PlantingRecord from './pages/farmer/PlantingRecord';
-import { NoBurningApplication, SaleRequest, PriceAnnouncement, MemberTier } from './pages/farmer/index';
-import { LeaderDashboard, FarmConfirmation } from './pages/leader/index';
-import { InspectorTaskList, InspectionForm } from './pages/inspector/index';
-import { AdminDashboard, AdminMap, AdminFarmersTable, AdminPriceManagement } from './pages/admin/index';
+// Layouts
+import MobileLayout from './layouts/MobileLayout'
+import AdminLayout from './layouts/AdminLayout'
 
-export type FarmerPage = 'dashboard'|'register'|'farms'|'addFarm'|'planting'|'noBurning'|'sale'|'prices'|'tier';
-export type LeaderPage = 'leaderDashboard'|'farmConfirmation';
-export type InspectorPage = 'taskList'|'inspectionForm';
-export type AdminPage = 'adminDashboard'|'adminMap'|'adminFarmers'|'adminPrices';
-export type AppPage = FarmerPage|LeaderPage|InspectorPage|AdminPage|'login';
+// Auth
+import LoginPage from './routes/LoginPage'
 
-const ROLE_HOME: Record<AppRole, AppPage> = {
-  farmer: 'dashboard', leader: 'leaderDashboard', inspector: 'taskList', admin: 'adminDashboard'
-};
+// Farmer pages
+import FarmerDashboard from './app/farmer/FarmerDashboard'
+import MyFarms from './app/farmer/MyFarms'
+import AddFarm from './app/farmer/AddFarm'
+import PlantingRecord from './app/farmer/PlantingRecord'
+import PriceAnnouncement from './app/farmer/PriceAnnouncement'
+import MemberTier from './app/farmer/MemberTier'
+
+// Leader pages
+import LeaderDashboard from './app/leader/LeaderDashboard'
+import FarmConfirmation from './app/leader/FarmConfirmation'
+
+// Inspector pages
+import InspectorTaskList from './app/inspector/InspectorTaskList'
+import InspectionForm from './app/inspector/InspectionForm'
+
+// Admin pages
+import AdminDashboard from './app/admin/AdminDashboard'
+import AdminFarmers from './app/admin/AdminFarmers'
+import AdminMap from './app/admin/AdminMap'
+import AdminPrices from './app/admin/AdminPrices'
+
+function ProtectedRoute({ role, children }: { role: string; children: React.ReactNode }) {
+  const { user } = useAuth()
+  if (!user) return <Navigate to="/login" replace />
+  if (user.role !== role) return <Navigate to="/login" replace />
+  return <>{children}</>
+}
 
 export default function App() {
-  const [user, setUser] = useState<AuthUser|null>(null);
-  const [page, setPage] = useState<AppPage>('login');
-  const [selectedInspectionId, setSelectedInspectionId] = useState<string|null>(null);
-
-  const navigate = (p: AppPage, extra?: Record<string,string>) => {
-    if(extra?.inspectionId) setSelectedInspectionId(extra.inspectionId);
-    setPage(p);
-  };
-
-  const handleLogin = (u: AuthUser) => {
-    setUser(u);
-    setPage(ROLE_HOME[u.role]);
-  };
-
-  const handleLogout = () => {
-    setUser(null);
-    setPage('login');
-  };
-
-  if (!user) return <LoginPage onLogin={handleLogin} />;
-
-  const role = user.role;
-
-  // Header user pill shown in layouts
-  const UserPill = () => (
-    <div className="flex items-center gap-2">
-      <div className="text-right hidden sm:block">
-        <div className="text-xs font-semibold text-white leading-tight">{user.name}</div>
-        <div className="text-[10px] text-white/60">{user.code}</div>
-      </div>
-      <button onClick={handleLogout}
-        className="w-8 h-8 rounded-full bg-white/20 border border-white/30 flex items-center justify-center text-white font-bold text-sm hover:bg-white/30 transition-colors"
-        title="ออกจากระบบ">
-        {user.name.charAt(0)}
-      </button>
-    </div>
-  );
-
-  if (role === 'admin') return (
-    <AdminLayout page={page as AdminPage} navigate={navigate} user={user} onLogout={handleLogout}>
-      {page==='adminDashboard' && <AdminDashboard navigate={navigate}/>}
-      {page==='adminMap'       && <AdminMap navigate={navigate}/>}
-      {page==='adminFarmers'   && <AdminFarmersTable navigate={navigate}/>}
-      {page==='adminPrices'    && <AdminPriceManagement navigate={navigate}/>}
-    </AdminLayout>
-  );
-
-  if (role === 'leader') return (
-    <FarmerLayout page={page} navigate={navigate} role="leader" user={user} onLogout={handleLogout}>
-      {page==='leaderDashboard' && <LeaderDashboard navigate={navigate}/>}
-      {page==='farmConfirmation' && <FarmConfirmation navigate={navigate}/>}
-    </FarmerLayout>
-  );
-
-  if (role === 'inspector') return (
-    <FarmerLayout page={page} navigate={navigate} role="inspector" user={user} onLogout={handleLogout}>
-      {page==='taskList' && <InspectorTaskList navigate={navigate} onSelectInspection={(id)=>navigate('inspectionForm',{inspectionId:id})}/>}
-      {page==='inspectionForm' && <InspectionForm navigate={navigate} inspectionId={selectedInspectionId}/>}
-    </FarmerLayout>
-  );
-
   return (
-    <FarmerLayout page={page} navigate={navigate} role="farmer" user={user} onLogout={handleLogout}>
-      {page==='dashboard' && <FarmerDashboard navigate={navigate}/>}
-      {page==='register'  && <RegisterFarmer navigate={navigate}/>}
-      {page==='farms'     && <MyFarms navigate={navigate}/>}
-      {page==='addFarm'   && <AddFarm navigate={navigate}/>}
-      {page==='planting'  && <PlantingRecord navigate={navigate}/>}
-      {page==='noBurning' && <NoBurningApplication navigate={navigate}/>}
-      {page==='sale'      && <SaleRequest navigate={navigate}/>}
-      {page==='prices'    && <PriceAnnouncement navigate={navigate}/>}
-      {page==='tier'      && <MemberTier navigate={navigate}/>}
-    </FarmerLayout>
-  );
+    <AuthProvider>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/" element={<Navigate to="/login" replace />} />
+
+        {/* ── Farmer (mobile) ── */}
+        <Route path="/farmer" element={
+          <ProtectedRoute role="farmer"><MobileLayout role="farmer" /></ProtectedRoute>
+        }>
+          <Route index element={<FarmerDashboard />} />
+          <Route path="farms" element={<MyFarms />} />
+          <Route path="farms/add" element={<AddFarm />} />
+          <Route path="planting" element={<PlantingRecord />} />
+          <Route path="prices" element={<PriceAnnouncement />} />
+          <Route path="tier" element={<MemberTier />} />
+        </Route>
+
+        {/* ── Leader (mobile) ── */}
+        <Route path="/leader" element={
+          <ProtectedRoute role="leader"><MobileLayout role="leader" /></ProtectedRoute>
+        }>
+          <Route index element={<LeaderDashboard />} />
+          <Route path="confirm" element={<FarmConfirmation />} />
+        </Route>
+
+        {/* ── Inspector (mobile) ── */}
+        <Route path="/inspector" element={
+          <ProtectedRoute role="inspector"><MobileLayout role="inspector" /></ProtectedRoute>
+        }>
+          <Route index element={<InspectorTaskList />} />
+          <Route path="form/:id" element={<InspectionForm />} />
+        </Route>
+
+        {/* ── Admin (desktop) ── */}
+        <Route path="/admin" element={
+          <ProtectedRoute role="admin"><AdminLayout /></ProtectedRoute>
+        }>
+          <Route index element={<AdminDashboard />} />
+          <Route path="farmers" element={<AdminFarmers />} />
+          <Route path="map" element={<AdminMap />} />
+          <Route path="prices" element={<AdminPrices />} />
+        </Route>
+
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </AuthProvider>
+  )
 }
