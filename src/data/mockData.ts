@@ -228,3 +228,101 @@ export const MOCK_SALE_REQUESTS_EXTENDED: SaleRequest[] = [
   { id: 'sr2', farmerId: 'f2', farmerName: 'สมหญิง รักษ์ไทย', quantity: 30, variety: 'ข้าวโพดอาหารสัตว์', grade: 'B', requestDate: '2025-04-20', status: 'pending' },
   { id: 'sr3', farmerId: 'f3', farmerName: 'วิชัย มั่นคง', quantity: 120, variety: 'ข้าวโพดหวาน', grade: 'A', requestDate: '2025-03-01', status: 'approved', price: 12000 },
 ];
+
+
+// ── Seed Varieties ─────────────────────────────────────────────────────────────
+
+export interface SeedVariety {
+  id: string
+  name: string                // ชื่อพันธุ์
+  fullName: string            // ชื่อเต็ม
+  seller: string              // ผู้ขายเมล็ดพันธุ์
+  mentor: string              // พี่เลี้ยง/เจ้าหน้าที่แนะนำ
+  mentorPhone: string
+  daysToHarvest: number       // จำนวนวันจากปลูกถึงเก็บเกี่ยว
+  plantingSpacing: string     // ระยะปลูก เช่น 75x25 ซม.
+  seedPerRai: number          // ปริมาณเมล็ดต่อไร่ (กก.)
+  yieldPerRai: number         // ผลผลิตเฉลี่ย ตัน/ไร่
+  season: string              // ฤดูกาลที่เหมาะสม
+  notes: string               // คำแนะนำ
+  steps: PlantingStep[]
+}
+
+export interface PlantingStep {
+  day: string                 // เช่น "วันที่ 0", "วันที่ 14-21"
+  title: string
+  description: string
+  icon: string
+}
+
+export const SEED_VARIETIES: SeedVariety[] = [
+  {
+    id: 'sv1',
+    name: 'PAC339',
+    fullName: 'ข้าวโพดเลี้ยงสัตว์ PAC 339',
+    seller: 'บริษัท Pacific Seeds (Thailand) จำกัด',
+    mentor: 'คุณวิชัย สุขสม',
+    mentorPhone: '081-234-5678',
+    daysToHarvest: 110,
+    plantingSpacing: '75 × 25 ซม.',
+    seedPerRai: 3.5,
+    yieldPerRai: 1.2,
+    season: 'ต้นฝน (พ.ค.–มิ.ย.) หรือปลายฝน (ก.ค.–ส.ค.)',
+    notes: 'ทนทานต่อโรคราน้ำค้าง เหมาะกับดินร่วนปนทราย',
+    steps: [
+      { day: 'วันที่ 0', title: 'เตรียมดินและปลูก', description: 'ไถพรวนดินลึก 20-25 ซม. ใส่ปุ๋ยรองพื้น 15-15-15 อัตรา 25 กก./ไร่ แล้วปลูกเมล็ด', icon: '🌱' },
+      { day: 'วันที่ 7-10', title: 'งอกและดูแลช่วงแรก', description: 'ตรวจสอบการงอก ถอนแยกให้เหลือต้นละ 1 ต้นต่อหลุม กำจัดวัชพืช', icon: '🌿' },
+      { day: 'วันที่ 14-21', title: 'ใส่ปุ๋ยครั้งที่ 1', description: 'ใส่ปุ๋ยยูเรีย 46-0-0 อัตรา 15 กก./ไร่ พร้อมกำจัดวัชพืช', icon: '💊' },
+      { day: 'วันที่ 35-45', title: 'ใส่ปุ๋ยครั้งที่ 2', description: 'ใส่ปุ๋ย 15-15-15 อัตรา 25 กก./ไร่ ช่วงข้าวโพดสูง 50-60 ซม.', icon: '💊' },
+      { day: 'วันที่ 60-70', title: 'ออกดอกและผสมเกสร', description: 'ดูแลน้ำให้เพียงพอ ห้ามขาดน้ำช่วงนี้', icon: '🌸' },
+      { day: 'วันที่ 90-100', title: 'ฝักพัฒนาเต็มที่', description: 'สังเกตสีเส้นไหมเปลี่ยนเป็นสีน้ำตาล ฝักเริ่มแห้ง', icon: '🌽' },
+      { day: 'วันที่ 110', title: 'เก็บเกี่ยว', description: 'ความชื้นเมล็ดลดเหลือ 25-30% เก็บเกี่ยวได้ ควรตากแดด 3-5 วัน', icon: '🚜' },
+    ],
+  },
+  {
+    id: 'sv2',
+    name: 'NK7328',
+    fullName: 'ข้าวโพดเลี้ยงสัตว์ NK 7328',
+    seller: 'บริษัท Syngenta (Thailand) จำกัด',
+    mentor: 'คุณสมศรี พาณิชย์',
+    mentorPhone: '089-876-5432',
+    daysToHarvest: 105,
+    plantingSpacing: '75 × 20 ซม.',
+    seedPerRai: 4.0,
+    yieldPerRai: 1.3,
+    season: 'เหมาะทุกฤดู ทนร้อนได้ดี',
+    notes: 'ให้ผลผลิตสูง ทนแล้งปานกลาง ระวังหนอนเจาะฝัก',
+    steps: [
+      { day: 'วันที่ 0', title: 'เตรียมดินและปลูก', description: 'ไถดะ ไถแปร ปรับหน้าดิน ใส่ปุ๋ยรองพื้น แล้วปลูก', icon: '🌱' },
+      { day: 'วันที่ 10-14', title: 'ดูแลต้นกล้า', description: 'ถอนแยก กำจัดวัชพืช ตรวจโรค-แมลง', icon: '🌿' },
+      { day: 'วันที่ 21-28', title: 'ใส่ปุ๋ยครั้งที่ 1', description: 'ปุ๋ยสูตร 46-0-0 อัตรา 20 กก./ไร่', icon: '💊' },
+      { day: 'วันที่ 40-50', title: 'ใส่ปุ๋ยครั้งที่ 2', description: 'ปุ๋ยสูตร 15-15-15 อัตรา 30 กก./ไร่', icon: '💊' },
+      { day: 'วันที่ 55-65', title: 'ออกดอก', description: 'ดูแลน้ำ ป้องกันหนอนเจาะฝัก', icon: '🌸' },
+      { day: 'วันที่ 85-95', title: 'ฝักสุก', description: 'เส้นไหมแห้ง ฝักเริ่มห้อยลง', icon: '🌽' },
+      { day: 'วันที่ 105', title: 'เก็บเกี่ยว', description: 'ความชื้นเมล็ด 25-28% เก็บเกี่ยวได้ทันที', icon: '🚜' },
+    ],
+  },
+  {
+    id: 'sv3',
+    name: 'CP888',
+    fullName: 'ข้าวโพดเลี้ยงสัตว์ CP 888',
+    seller: 'บริษัท เจริญโภคภัณฑ์เมล็ดพันธุ์ จำกัด',
+    mentor: 'คุณประเสริฐ ธัญญา',
+    mentorPhone: '085-123-4567',
+    daysToHarvest: 115,
+    plantingSpacing: '80 × 25 ซม.',
+    seedPerRai: 3.0,
+    yieldPerRai: 1.1,
+    season: 'ต้นฝน เหมาะดินเหนียว',
+    notes: 'ลำต้นแข็งแรง ทนลม ไม่ล้มง่าย เหมาะพื้นที่ลุ่ม',
+    steps: [
+      { day: 'วันที่ 0', title: 'เตรียมดินและปลูก', description: 'ยกร่องดิน ปรับระบายน้ำ ปลูกระยะ 80×25 ซม.', icon: '🌱' },
+      { day: 'วันที่ 10-15', title: 'ดูแลต้นกล้า', description: 'ถอนแยก เติมน้ำ กำจัดวัชพืช', icon: '🌿' },
+      { day: 'วันที่ 20-25', title: 'ใส่ปุ๋ยครั้งที่ 1', description: 'ปุ๋ยยูเรีย 15 กก./ไร่', icon: '💊' },
+      { day: 'วันที่ 45-55', title: 'ใส่ปุ๋ยครั้งที่ 2', description: 'ปุ๋ยสูตร 15-15-15 ครั้งที่ 2', icon: '💊' },
+      { day: 'วันที่ 65-75', title: 'ออกดอกและผสมเกสร', description: 'ให้น้ำสม่ำเสมอ ป้องกันเพลี้ย', icon: '🌸' },
+      { day: 'วันที่ 100-110', title: 'ฝักพัฒนา', description: 'ตรวจความชื้นฝัก', icon: '🌽' },
+      { day: 'วันที่ 115', title: 'เก็บเกี่ยว', description: 'ความชื้น 25% เหมาะเก็บเกี่ยว', icon: '🚜' },
+    ],
+  },
+]

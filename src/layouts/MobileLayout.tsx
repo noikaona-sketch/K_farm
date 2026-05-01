@@ -8,17 +8,17 @@ type MobileRole = 'farmer' | 'leader' | 'inspector'
 
 const NAV = {
   farmer: [
-    { to: '/farmer',          Icon: Home,         label: 'หน้าแรก' },
-    { to: '/farmer/planting', Icon: ClipboardList, label: 'สถานะ' },
-    { to: '/farmer/register', Icon: Upload,        label: 'ส่งงาน' },
+    { to: '/farmer',         Icon: Home,         label: 'หน้าแรก',  end: true },
+    { to: '/farmer/planting', Icon: ClipboardList, label: 'แจ้งปลูก', end: false },
+    { to: '/farmer/register', Icon: Upload,        label: 'สมัคร',    end: false },
   ],
   leader: [
-    { to: '/leader',         Icon: Home,        label: 'หน้าแรก' },
-    { to: '/leader/confirm', Icon: CheckSquare, label: 'อนุมัติ' },
+    { to: '/leader',         Icon: Home,        label: 'หน้าแรก',   end: true },
+    { to: '/leader/confirm', Icon: CheckSquare, label: 'อนุมัติ',    end: false },
   ],
   inspector: [
-    { to: '/inspector',     Icon: Home,   label: 'หน้าแรก' },
-    { to: '/inspector/form/ins1', Icon: Search, label: 'ตรวจสอบ' },
+    { to: '/inspector',           Icon: Home,   label: 'หน้าแรก',    end: true },
+    { to: '/inspector/form/ins1', Icon: Search, label: 'ตรวจสอบ',   end: false },
   ],
 }
 
@@ -38,18 +38,17 @@ export default function MobileLayout({ role }: { role: MobileRole }) {
       {/* Header */}
       <div className="bg-emerald-600 text-white px-5 py-4 flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center overflow-hidden shadow-md">
+          <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center overflow-hidden shadow-md flex-shrink-0">
             <img src={logoImage} alt="Logo" className="w-full h-full object-cover" />
           </div>
           <div>
             <div className="font-bold text-lg leading-tight">ครอบครัวก้าวหน้า</div>
-            <div className="text-xs opacity-80 tracking-wide">{ROLE_TITLE[role]}</div>
+            <div className="text-[10px] opacity-80 tracking-widest uppercase">{ROLE_TITLE[role]}</div>
           </div>
         </div>
         <button
           onClick={() => { logout(); navigate('/login', { replace: true }) }}
-          className="bg-white/20 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-white/30 transition-colors"
-        >
+          className="bg-white/20 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-white/30 transition-colors flex-shrink-0">
           {user?.name?.split(' ')[0] ?? 'ออก'}
         </button>
       </div>
@@ -60,17 +59,17 @@ export default function MobileLayout({ role }: { role: MobileRole }) {
       </main>
 
       {/* Bottom nav */}
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-white border-t border-gray-200 px-5 py-3 z-40 shadow-lg">
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-white border-t border-gray-200 px-5 py-2.5 z-40 shadow-lg">
         <div className="flex items-center justify-around">
-          {navItems.map(({ to, Icon, label }) => (
-            <NavLink key={to} to={to} end={to.split('/').length <= 2}
+          {navItems.map(({ to, Icon, label, end }) => (
+            <NavLink key={to} to={to} end={end}
               className={({ isActive }) =>
-                `flex flex-col items-center gap-1 transition-colors ${isActive ? 'text-emerald-600' : 'text-gray-400'}`
+                `flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-all ${isActive ? 'text-emerald-600 bg-emerald-50' : 'text-gray-400 hover:text-gray-600'}`
               }>
               {({ isActive }) => (
                 <>
                   <Icon className="w-6 h-6" strokeWidth={isActive ? 2.5 : 2} />
-                  <span className={`text-xs ${isActive ? 'font-semibold' : ''}`}>{label}</span>
+                  <span className={`text-[10px] font-medium ${isActive ? 'text-emerald-600' : ''}`}>{label}</span>
                 </>
               )}
             </NavLink>
