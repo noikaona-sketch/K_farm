@@ -340,3 +340,135 @@ export async function upsertPrice(
   if (error) logSupabaseError('upsertPrice', error)
   return { data, error: error?.message ?? null, source: 'supabase' }
 }
+
+
+// ── Admin: fetch pending registrations from profiles + farmers ────────────────
+
+export interface PendingRegistration {
+  id: string            // profiles.id
+  farmerId?: string     // farmers.id
+  fullName: string
+  phone: string
+  idCard?: string
+  code?: string
+  province?: string
+  district?: string
+  village?: string
+  status: string        // farmers.status
+  createdAt: string
+}
+
+export async function fetchPendingRegistrations(): Promise<DbResult<PendingRegistration[]>> {
+  if (!supabase) {
+    // Mock pending data
+    return {
+      data: [
+        { id: 'p1', farmerId: 'f-new-1', fullName: 'สมชาย ใจดี (Mock)', phone: '0812345678', code: 'KF001', province: 'บุรีรัมย์', district: 'เมือง', village: 'บ้านดง', status: 'pending', createdAt: new Date().toISOString() },
+        { id: 'p2', farmerId: 'f-new-2', fullName: 'นภา ฟ้าใส (Mock)', phone: '0823456789', code: 'KF002', province: 'บุรีรัมย์', district: 'กระสัง', village: 'บ้านทุ่ง', status: 'pending', createdAt: new Date().toISOString() },
+      ],
+      error: null,
+      source: 'mock',
+    }
+  }
+  // join profiles + farmers where status = pending
+  const { data, error } = await supabase
+    .from('farmers')
+    .select(`
+      id,
+      code,
+      province,
+      district,
+      village,
+      status,
+      created_at,
+      profiles (
+        id,
+        full_name,
+        phone,
+        id_card
+      )
+    `)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    logSupabaseError('fetchPendingRegistrations', error)
+    return { data: [], error: error.message, source: 'supabase' }
+  }
+
+  const mapped: PendingRegistration[] = (data ?? []).map((row: Record<string, unknown>) => {
+    const profile = row.profiles as Record<string, unknown> | null
+    return {
+      id: String(profile?.id ?? row.id),
+      farmerId: String(row.id),
+      fullName: String(profile?.full_name ?? 'ไม่ระบุ'),
+      phone: String(profile?.phone ?? ''),
+      idCard: profile?.id_card ? String(profile.id_card) : undefined,
+      code: String(row.code ?? ''),
+      province: String(row.province ?? ''),
+      district: String(row.district ?? ''),
+      village: String(row.village ?? ''),
+      status: String(row.status ?? 'pending'),
+      createdAt: String(row.created_at ?? ''),
+    }
+  })
+  return { data: mapped, error: null, source: 'supabase' }
+}
+
+export async function fetchAllFarmers(): Promise<DbResult<PendingRegistration[]>> {
+  if (!supabase) {
+    return {
+      data: [
+        { id: 'p1', farmerId: 'f1', fullName: 'สมชาย ใจดี (Mock)', phone: '0812345678', code: 'KF001', province: 'บุรีรัมย์', district: 'เมือง', village: 'บ้านดง', status: 'approved', createdAt: '2024-11-01' },
+        { id: 'p2', farmerId: 'f2', fullName: 'สมหญิง รักษ์ไทย (Mock)', phone: '0898765432', code: 'KF002', province: 'บุรีรัมย์', district: 'ประโคนชัย', village: 'บ้านโนน', status: 'approved', createdAt: '2024-11-05' },
+        { id: 'p3', farmerId: 'f3', fullName: 'นภา ฟ้าใส (Mock)', phone: '0823456789', code: 'KF003', province: 'บุรีรัมย์', district: 'กระสัง', village: 'บ้านทุ่ง', status: 'pending', createdAt: '2025-04-30' },
+      ],
+      error: null,
+      source: 'mock',
+    }
+  }
+  const { data, error } = await supabase
+    .from('farmers')
+    .select(`id, code, province, district, village, status, created_at, profiles(id, full_name, phone, id_card)`)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    logSupabaseError('fetchAllFarmers', error)
+    return { data: [], error: error.message, source: 'supabase' }
+  }
+  const mapped: PendingRegistration[] = (data ?? []).map((row: Record<string, unknown>) => {
+    const profile = row.profiles as Record<string, unknown> | null
+    return {
+      id: String(profile?.id ?? row.id),
+      farmerId: String(row.id),
+      fullName: String(profile?.full_name ?? 'ไม่ระบุ'),
+      phone: String(profile?.phone ?? ''),
+      idCard: profile?.id_card ? String(profile.id_card) : undefined,
+      code: String(row.code ?? ''),
+      province: String(row.province ?? ''),
+      district: String(row.district ?? ''),
+      village: String(row.village ?? ''),
+      status: String(row.status ?? 'pending'),
+      createdAt: String(row.created_at ?? ''),
+    }
+  })
+  return { data: mapped, error: null, source: 'supabase' }
+}
+
+export async function updateFarmerStatus(
+  farmerId: string,
+  status: 'approved' | 'rejected',
+  note?: string
+): Promise<DbResult<null>> {
+  if (!supabase) {
+    console.info('[mock] updateFarmerStatus', farmerId, status)
+    return { data: null, error: null, source: 'mock' }
+  }
+  const { error } = await supabase
+    .from('farmers')
+    .update({ status, admin_note: note ?? null })
+    .eq('id', farmerId)
+
+  if (error) logSupabaseError('updateFarmerStatus', error)
+  return { data: null, error: error?.message ?? null, source: 'supabase' }
+}
