@@ -99,7 +99,7 @@ export default function SignIn() {
             <input
               type="text"
               value={idCard}
-              onChange={e => { setIdCard(e.target.value); setErr(null) }}
+              onChange={e => { setIdCard(e.target.value); if (err) setErr(null) }}
               placeholder="1-xxxx-xxxxx-xx-x"
               inputMode="numeric"
               maxLength={17}
@@ -118,7 +118,7 @@ export default function SignIn() {
               <input
                 type={showPhone ? 'text' : 'password'}
                 value={phone}
-                onChange={e => { setPhone(e.target.value); setErr(null) }}
+                onChange={e => { setPhone(e.target.value); if (err) setErr(null) }}
                 placeholder="08x-xxx-xxxx"
                 inputMode="numeric"
                 className="w-full border-2 border-gray-200 rounded-2xl px-5 py-4 text-lg pr-14 focus:outline-none focus:border-emerald-500 transition-colors bg-white"

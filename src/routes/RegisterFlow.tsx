@@ -37,8 +37,9 @@ export default function RegisterFlow() {
 
   const u = (k: keyof FormState, v: string) => {
     setForm(f => ({ ...f, [k]: v }))
-    setFieldErr(fe => ({ ...fe, [k]: undefined }))
-    setErr(null)
+    // clear error only if there was one — avoid extra re-render every keystroke
+    if (fieldErr[k]) setFieldErr(fe => ({ ...fe, [k]: undefined }))
+    if (err) setErr(null)
   }
 
   const validate = (): boolean => {
