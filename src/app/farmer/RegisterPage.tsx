@@ -7,6 +7,7 @@ import {
 import { useAuth, type RegStatus } from '../../routes/AuthContext'
 import { insertProfile, insertFarmer } from '../../lib/db'
 import { isSupabaseReady } from '../../lib/supabase'
+import { uploadFarmPhoto } from '../../lib/storage'
 
 function readExifCoords(file: File): Promise<{ lat: number; lng: number } | null> {
   return new Promise(resolve => {
@@ -66,6 +67,7 @@ export default function RegisterPage() {
   const [gpsLoading, setGpsLoading] = useState(false)
   const [ocrLoading, setOcrLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [uploadStep, setUploadStep] = useState<string>('')   // ข้อความ loading
   const [done, setDone] = useState(false)
   const [insertedFarmerId, setInsertedFarmerId] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -100,21 +102,41 @@ export default function RegisterPage() {
 
   const handleSubmit = async () => {
     if (!plotFile || !coords) return
-    setSaving(true); setErr(null)
+    setSaving(true); setErr(null); setUploadStep('')
+
     try {
-      // 1. Insert profile
+      // ── STEP 1: บันทึกข้อมูลส่วนตัว ──
+      setUploadStep('กำลังบันทึกข้อมูลส่วนตัว...')
       const profileRes = await insertProfile({
         full_name: form.name.trim() || 'ไม่ระบุ',
         phone: form.phone.trim(),
         id_card: form.idcard.trim() || undefined,
         role: 'farmer',
       })
-      // ถ้า Supabase พร้อมแต่ error → ห้าม continue
       if (isSupabaseReady && profileRes.error) {
         throw new Error(`บันทึกข้อมูลส่วนตัวไม่สำเร็จ: ${profileRes.error}`)
       }
 
-      // 2. Insert farmer
+      const farmerId = profileRes.data?.id ?? `mock-${Date.now()}`
+
+      // ── STEP 2: อัปโหลดรูปแปลงไปยัง Storage bucket: farm-photos ──
+      let photoUrl: string | null = null
+      if (isSupabaseReady) {
+        setUploadStep('กำลังอัปโหลดรูปแปลงไปยัง Storage...')
+        try {
+          photoUrl = await uploadFarmPhoto(plotFile, farmerId)
+        } catch (uploadErr: unknown) {
+          const uploadErrMsg = uploadErr instanceof Error ? uploadErr.message : 'อัปโหลดรูปไม่สำเร็จ'
+          console.error('[RegisterPage] photo upload failed:', uploadErrMsg)
+          // แจ้งเตือนแต่ยังดำเนินการต่อ — ไม่ให้รูปพัง flow ทั้งหมด
+          setErr(`⚠️ ${uploadErrMsg} — ข้อมูลจะยังถูกบันทึกโดยไม่มีรูป`)
+        }
+      } else {
+        console.info('[RegisterPage] mock mode — skipping Storage upload')
+      }
+
+      // ── STEP 3: บันทึกข้อมูลเกษตรกร พร้อม photo_url + พิกัด ──
+      setUploadStep('กำลังบันทึกข้อมูลเกษตรกร...')
       const farmerRes = await insertFarmer({
         profile_id: profileRes.data?.id,
         code: user?.code ?? `KF${Date.now()}`,
@@ -124,14 +146,18 @@ export default function RegisterPage() {
         total_area: 0,
         tier: 'bronze',
         status: 'pending',
+        photo_url: photoUrl ?? undefined,
+        lat: coords.lat,
+        lng: coords.lng,
       })
       if (isSupabaseReady && farmerRes.error) {
         throw new Error(`บันทึกข้อมูลเกษตรกรไม่สำเร็จ: ${farmerRes.error}`)
       }
 
       setInsertedFarmerId(farmerRes.data?.id ?? null)
+      setUploadStep('บันทึกสำเร็จ! ✓')
 
-      // อัปเดต AuthContext ให้ชื่อ + สถานะเปลี่ยนทันที
+      // ── STEP 4: อัปเดต AuthContext ทันที ──
       const registeredName = form.name.trim() || user?.name || 'ไม่ระบุ'
       login({
         ...(user!),
@@ -147,6 +173,7 @@ export default function RegisterPage() {
       console.error('[RegisterPage] submit error:', msg)
     } finally {
       setSaving(false)
+      setUploadStep('')
     }
   }
 
@@ -158,8 +185,13 @@ export default function RegisterPage() {
       <h2 className="text-2xl font-bold text-gray-900 mb-3">ส่งคำขอสำเร็จ!</h2>
       {isSupabaseReady
         ? <p className="text-emerald-600 text-sm font-semibold mb-1">🟢 บันทึกลง Supabase เรียบร้อย</p>
-        : <p className="text-amber-600 text-sm font-semibold mb-1">🟡 บันทึก Mock (ไม่มี Supabase credentials)</p>
+        : <p className="text-amber-600 text-sm font-semibold mb-1">🟡 Mock mode (ไม่มี Supabase credentials)</p>
       }
+      {isSupabaseReady && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 mb-2 text-xs text-emerald-700 font-medium">
+          📸 รูปแปลงบันทึกลง Storage: <span className="font-mono">farm-photos/farmers/...</span>
+        </div>
+      )}
       {insertedFarmerId && (
         <p className="text-xs text-gray-400 font-mono mb-3">Farmer ID: {insertedFarmerId}</p>
       )}
@@ -363,11 +395,17 @@ export default function RegisterPage() {
           )}
 
           {saving && (
-            <div className="fixed inset-0 bg-black/60 flex flex-col items-center justify-center z-50">
-              <RefreshCw className="w-12 h-12 text-white animate-spin mb-4" />
-              <p className="text-white text-lg font-bold">
-                กำลังบันทึก{isSupabaseReady ? ' ลง Supabase...' : ' (Mock)...'}
-              </p>
+            <div className="fixed inset-0 bg-black/70 flex flex-col items-center justify-center z-50 p-6">
+              <div className="bg-white rounded-3xl p-8 flex flex-col items-center gap-4 max-w-xs w-full shadow-2xl">
+                <RefreshCw className="w-12 h-12 text-emerald-600 animate-spin" />
+                <div className="text-center">
+                  <p className="text-gray-800 font-bold text-base">กำลังดำเนินการ...</p>
+                  <p className="text-emerald-600 text-sm mt-1 font-medium min-h-[20px]">{uploadStep}</p>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                  <div className="h-full bg-emerald-500 rounded-full animate-pulse w-3/4" />
+                </div>
+              </div>
             </div>
           )}
 

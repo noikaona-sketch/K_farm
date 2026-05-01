@@ -33,6 +33,9 @@ export interface FarmerInsert {
   total_area?: number
   tier?: string
   status?: string
+  photo_url?: string
+  lat?: number
+  lng?: number
 }
 
 export interface FarmInsert {
@@ -46,6 +49,7 @@ export interface FarmInsert {
   lng?: number
   soil_type?: string
   water_source?: string
+  photo_url?: string
 }
 
 export interface PlantingCycleInsert {

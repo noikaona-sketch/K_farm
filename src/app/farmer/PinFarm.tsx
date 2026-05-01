@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, MapPin, Camera, RefreshCw, Check, AlertCircle, ImagePlus } from 'lucide-react'
 import { useAuth } from '../../routes/AuthContext'
 import { insertFarm } from '../../lib/db'
+import { uploadFarmPhoto } from '../../lib/storage'
 import { isSupabaseReady } from '../../lib/supabase'
 
 async function readExifCoords(file: File): Promise<{ lat: number; lng: number } | null> {
@@ -53,6 +54,7 @@ export default function PinFarm() {
   const navigate = useNavigate()
   const [form, setForm] = useState({ name: '', area: '', soil: 'ดินร่วน', water: 'น้ำฝน', district: '', village: '' })
   const [photo, setPhoto] = useState<string | null>(null)
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null)
   const [gpsSource, setGpsSource] = useState<string>('')
   const [gpsLoading, setGpsLoading] = useState(false)
@@ -71,6 +73,7 @@ export default function PinFarm() {
 
   const handlePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return
+    setPhotoFile(file)  // เก็บ File object สำหรับ upload
     const reader = new FileReader()
     reader.onload = ev => setPhoto(ev.target!.result as string)
     reader.readAsDataURL(file)
@@ -84,22 +87,42 @@ export default function PinFarm() {
     if (!form.area || isNaN(parseFloat(form.area))) { setErr('กรุณากรอกพื้นที่เป็นตัวเลข'); return }
     if (!coords) { setErr('กรุณาถ่ายรูปแปลงหรือกดดึงพิกัด GPS'); return }
     setSaving(true); setErr(null)
-    const res = await insertFarm({
-      farmer_id: user?.id ?? 'mock',
-      name: form.name.trim(),
-      area: parseFloat(form.area),
-      province: 'บุรีรัมย์',
-      district: form.district.trim(),
-      village: form.village.trim(),
-      lat: coords.lat,
-      lng: coords.lng,
-      soil_type: form.soil,
-      water_source: form.water,
-    })
-    setSaving(false)
-    if (isSupabaseReady && res.error) { setErr(`บันทึกแปลงไม่สำเร็จ: ${res.error}`); return }
-    setFarmId(res.data?.id ?? null)
-    setDone(true)
+    try {
+      const uid = user?.id ?? 'mock'
+
+      // อัปโหลดรูปแปลงไปยัง Storage ก่อน
+      let photoUrl: string | null = null
+      if (photo && photoFile && isSupabaseReady) {
+        try {
+          photoUrl = await uploadFarmPhoto(photoFile, uid)
+        } catch (uploadErr: unknown) {
+          const msg = uploadErr instanceof Error ? uploadErr.message : 'อัปโหลดรูปไม่สำเร็จ'
+          console.error('[PinFarm] upload error:', msg)
+          setErr(`⚠️ ${msg} — จะบันทึกแปลงโดยไม่มีรูป`)
+        }
+      }
+
+      const res = await insertFarm({
+        farmer_id: uid,
+        name: form.name.trim(),
+        area: parseFloat(form.area),
+        province: 'บุรีรัมย์',
+        district: form.district.trim(),
+        village: form.village.trim(),
+        lat: coords.lat,
+        lng: coords.lng,
+        soil_type: form.soil,
+        water_source: form.water,
+        photo_url: photoUrl ?? undefined,
+      })
+      if (isSupabaseReady && res.error) throw new Error(`บันทึกแปลงไม่สำเร็จ: ${res.error}`)
+      setFarmId(res.data?.id ?? null)
+      setDone(true)
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : 'เกิดข้อผิดพลาด')
+    } finally {
+      setSaving(false)
+    }
   }
 
   if (done) return (
