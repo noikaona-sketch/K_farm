@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Check, AlertCircle, RefreshCw } from 'lucide-react'
+import { Check, AlertCircle, RefreshCw, Wifi, WifiOff } from 'lucide-react'
 import { useAuth } from '../../routes/AuthContext'
 import { insertFarm } from '../../lib/db'
 import { isSupabaseReady } from '../../lib/supabase'
@@ -19,22 +19,29 @@ export default function AddFarm() {
   const u = (k: keyof typeof form, v: string) => setForm(f => ({ ...f, [k]: v }))
 
   const handleSave = async () => {
-    if (!form.name || !form.area) { setErr('กรุณากรอกชื่อแปลงและพื้นที่'); return }
+    if (!form.name.trim()) { setErr('กรุณากรอกชื่อแปลง'); return }
+    if (!form.area || isNaN(parseFloat(form.area))) { setErr('กรุณากรอกพื้นที่เป็นตัวเลข'); return }
     setSaving(true); setErr(null)
+
     const res = await insertFarm({
       farmer_id: user?.id ?? 'mock-farmer',
-      name: form.name,
-      area: parseFloat(form.area) || 0,
+      name: form.name.trim(),
+      area: parseFloat(form.area),
       province: form.province,
-      district: form.district,
-      village: form.village,
+      district: form.district.trim(),
+      village: form.village.trim(),
       lat: form.lat ? parseFloat(form.lat) : undefined,
       lng: form.lng ? parseFloat(form.lng) : undefined,
       soil_type: form.soil,
       water_source: form.water,
     })
     setSaving(false)
-    if (res.error && isSupabaseReady) { setErr(res.error); return }
+
+    // ห้ามแสดง success ถ้า Supabase error
+    if (isSupabaseReady && res.error) {
+      setErr(`บันทึกแปลงไม่สำเร็จ: ${res.error}`)
+      return
+    }
     setInsertedId(res.data?.id ?? null)
     setDone(true)
   }
@@ -44,12 +51,13 @@ export default function AddFarm() {
       <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center text-4xl">🌾</div>
       <h2 className="text-xl font-bold text-emerald-700">เพิ่มแปลงสำเร็จ!</h2>
       {isSupabaseReady
-        ? <p className="text-emerald-600 text-sm font-medium">🟢 บันทึกลง Supabase</p>
-        : <p className="text-amber-600 text-sm font-medium">🟡 Mock (ไม่มี Supabase)</p>}
+        ? <p className="text-emerald-600 text-sm font-semibold">🟢 บันทึกลง Supabase: farms</p>
+        : <p className="text-amber-600 text-sm font-semibold">🟡 Mock mode (ไม่มี Supabase)</p>
+      }
       {insertedId && <p className="text-xs text-gray-400 font-mono">Farm ID: {insertedId}</p>}
       <p className="text-gray-500 text-sm">แปลงจะถูกส่งให้หัวหน้ากลุ่มยืนยัน</p>
       <button onClick={() => navigate('/farmer/farms')}
-        className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-semibold text-sm hover:bg-emerald-700 transition-colors">
+        className="bg-emerald-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-emerald-700 transition-colors">
         ดูแปลงของฉัน
       </button>
     </div>
@@ -58,16 +66,32 @@ export default function AddFarm() {
   return (
     <div className="p-4 space-y-4">
       <div className="flex items-center gap-3">
-        <button onClick={() => navigate(-1)} className="p-2 rounded-xl hover:bg-gray-100">←</button>
+        <button onClick={() => navigate(-1)} className="p-2 rounded-xl hover:bg-gray-100 transition-colors">←</button>
         <div>
           <h1 className="font-bold text-gray-800">เพิ่มแปลงใหม่</h1>
-          <p className="text-xs text-gray-400">{isSupabaseReady ? '🟢 Supabase' : '🟡 Mock mode'}</p>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            {isSupabaseReady
+              ? <><Wifi className="w-3 h-3 text-emerald-600" /><span className="text-xs text-emerald-600">บันทึกลง Supabase</span></>
+              : <><WifiOff className="w-3 h-3 text-amber-500" /><span className="text-xs text-amber-600">Mock mode</span></>
+            }
+          </div>
         </div>
       </div>
 
+      {!isSupabaseReady && (
+        <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-3 flex items-start gap-2">
+          <WifiOff className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-700">ไม่มี Supabase credentials — ข้อมูลจะ<strong>ไม่</strong>ถูกบันทึกจริง</p>
+        </div>
+      )}
+
       {err && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-center gap-2 text-red-700 text-sm">
-          <AlertCircle className="w-4 h-4 flex-shrink-0" />{err}
+        <div className="bg-red-50 border-2 border-red-300 rounded-xl p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-bold text-red-700">บันทึกไม่สำเร็จ</p>
+            <p className="text-sm text-red-600 mt-0.5">{err}</p>
+          </div>
         </div>
       )}
 
@@ -83,9 +107,12 @@ export default function AddFarm() {
         ].map(({ l, k, p }) => (
           <div key={k}>
             <label className="text-xs font-semibold text-gray-600 block mb-1">{l}</label>
-            <input value={form[k as keyof typeof form]} onChange={e => u(k as keyof typeof form, e.target.value)}
+            <input
+              value={form[k as keyof typeof form]}
+              onChange={e => u(k as keyof typeof form, e.target.value)}
               placeholder={p}
-              className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-emerald-500 transition-colors" />
+              className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-emerald-500 transition-colors"
+            />
           </div>
         ))}
         {[
@@ -107,8 +134,11 @@ export default function AddFarm() {
       </div>
 
       <button onClick={handleSave} disabled={saving}
-        className={`w-full bg-emerald-600 text-white py-3 rounded-xl font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 ${saving ? 'opacity-70' : 'hover:bg-emerald-700 active:scale-[.98]'}`}>
-        {saving ? <><RefreshCw className="w-4 h-4 animate-spin" />กำลังบันทึก...</> : '✓ บันทึกแปลง'}
+        className={`w-full bg-emerald-600 text-white py-3.5 rounded-xl font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 ${saving ? 'opacity-70 cursor-not-allowed' : 'hover:bg-emerald-700 active:scale-[.98]'}`}>
+        {saving
+          ? <><RefreshCw className="w-4 h-4 animate-spin" />กำลังบันทึก...</>
+          : '✓ บันทึกแปลง'
+        }
       </button>
     </div>
   )

@@ -2,13 +2,12 @@ import React, { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ChevronLeft, Camera, FileText, User, Check,
-  AlertCircle, MapPin, RefreshCw, ImagePlus,
+  AlertCircle, MapPin, RefreshCw, ImagePlus, Wifi, WifiOff,
 } from 'lucide-react'
 import { useAuth } from '../../routes/AuthContext'
 import { insertProfile, insertFarmer } from '../../lib/db'
 import { isSupabaseReady } from '../../lib/supabase'
 
-// ── EXIF GPS reader ────────────────────────────────────────
 function readExifCoords(file: File): Promise<{ lat: number; lng: number } | null> {
   return new Promise(resolve => {
     const reader = new FileReader()
@@ -22,10 +21,8 @@ function readExifCoords(file: File): Promise<{ lat: number; lng: number } | null
           if (marker === 0xFFE1) {
             const es = String.fromCharCode(...new Uint8Array(e.target!.result as ArrayBuffer, off + 2, 4))
             if (es !== 'Exif') return resolve(null)
-            const ts = off + 8
-            const le = view.getUint16(ts, false) === 0x4949
-            const ifd0 = ts + view.getUint32(ts + 4, le)
-            const ent = view.getUint16(ifd0, le)
+            const ts = off + 8; const le = view.getUint16(ts, false) === 0x4949
+            const ifd0 = ts + view.getUint32(ts + 4, le); const ent = view.getUint16(ifd0, le)
             let gpsOff: number | null = null
             for (let i = 0; i < ent; i++)
               if (view.getUint16(ifd0 + 2 + i * 12, le) === 0x8825)
@@ -70,7 +67,7 @@ export default function RegisterPage() {
   const [ocrLoading, setOcrLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [done, setDone] = useState(false)
-  const [insertedId, setInsertedId] = useState<string | null>(null)
+  const [insertedFarmerId, setInsertedFarmerId] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
 
   const requestGPS = () => {
@@ -97,7 +94,6 @@ export default function RegisterPage() {
     const reader = new FileReader()
     reader.onload = ev => setOcrPreview(ev.target!.result as string)
     reader.readAsDataURL(file)
-    // Simulate OCR processing; real implementation calls /api/ocr/read-bill
     await new Promise(r => setTimeout(r, 1200))
     setOcrLoading(false); setStep(3)
   }
@@ -106,56 +102,67 @@ export default function RegisterPage() {
     if (!plotFile || !coords) return
     setSaving(true); setErr(null)
     try {
-      // Insert profile row
+      // 1. Insert profile
       const profileRes = await insertProfile({
-        full_name: form.name || 'ไม่ระบุ',
-        phone: form.phone || '',
-        id_card: form.idcard || '',
+        full_name: form.name.trim() || 'ไม่ระบุ',
+        phone: form.phone.trim(),
+        id_card: form.idcard.trim() || undefined,
         role: 'farmer',
       })
-      if (profileRes.error && isSupabaseReady) throw new Error(profileRes.error)
+      // ถ้า Supabase พร้อมแต่ error → ห้าม continue
+      if (isSupabaseReady && profileRes.error) {
+        throw new Error(`บันทึกข้อมูลส่วนตัวไม่สำเร็จ: ${profileRes.error}`)
+      }
 
-      // Insert farmer row
+      // 2. Insert farmer
       const farmerRes = await insertFarmer({
         profile_id: profileRes.data?.id,
         code: user?.code ?? `KF${Date.now()}`,
         province: form.province,
-        district: form.district || 'ไม่ระบุ',
-        village: form.village || 'ไม่ระบุ',
+        district: form.district.trim() || 'ไม่ระบุ',
+        village: form.village.trim() || 'ไม่ระบุ',
         total_area: 0,
         tier: 'bronze',
         status: 'pending',
       })
-      if (farmerRes.error && isSupabaseReady) throw new Error(farmerRes.error)
+      if (isSupabaseReady && farmerRes.error) {
+        throw new Error(`บันทึกข้อมูลเกษตรกรไม่สำเร็จ: ${farmerRes.error}`)
+      }
 
-      setInsertedId(farmerRes.data?.id ?? null)
+      setInsertedFarmerId(farmerRes.data?.id ?? null)
       setDone(true)
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : 'บันทึกไม่สำเร็จ')
+      const msg = e instanceof Error ? e.message : 'เกิดข้อผิดพลาดไม่ทราบสาเหตุ'
+      setErr(msg)
+      console.error('[RegisterPage] submit error:', msg)
     } finally {
       setSaving(false)
     }
   }
 
-  // ── Success screen ─────────────────────────────────────────
   if (done) return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-5 text-center">
       <div className="w-24 h-24 bg-emerald-100 rounded-full flex items-center justify-center mb-5">
         <Check className="w-12 h-12 text-emerald-600" />
       </div>
       <h2 className="text-2xl font-bold text-gray-900 mb-3">ส่งคำขอสำเร็จ!</h2>
-      <p className="text-gray-500 leading-relaxed mb-2">ข้อมูลของคุณถูกบันทึกแล้ว</p>
       {isSupabaseReady
-        ? <p className="text-emerald-600 text-sm font-medium mb-1">🟢 บันทึกลง Supabase สำเร็จ</p>
-        : <p className="text-amber-600 text-sm font-medium mb-1">🟡 บันทึกแบบ Mock (ไม่มี Supabase)</p>}
-      {insertedId && <p className="text-xs text-gray-400 font-mono mb-4">ID: {insertedId}</p>}
-      <p className="text-gray-500 text-sm mb-6">รอ Leader ในกลุ่มอนุมัติภายใน 1-2 วัน</p>
+        ? <p className="text-emerald-600 text-sm font-semibold mb-1">🟢 บันทึกลง Supabase เรียบร้อย</p>
+        : <p className="text-amber-600 text-sm font-semibold mb-1">🟡 บันทึก Mock (ไม่มี Supabase credentials)</p>
+      }
+      {insertedFarmerId && (
+        <p className="text-xs text-gray-400 font-mono mb-3">Farmer ID: {insertedFarmerId}</p>
+      )}
+      <p className="text-gray-500 text-sm leading-relaxed mb-6">
+        รอ Leader ในกลุ่มอนุมัติภายใน 1–2 วัน<br />
+        ระบบจะแจ้งเตือนผ่าน LINE ค่ะ
+      </p>
       <div className="bg-emerald-50 rounded-2xl p-5 mb-6 text-left w-full max-w-sm">
-        <div className="text-sm text-emerald-800 font-semibold mb-3">ขั้นตอนถัดไป</div>
+        <p className="text-sm text-emerald-800 font-bold mb-3">ขั้นตอนถัดไป</p>
         {['Leader ตรวจสอบข้อมูล', 'Admin อนุมัติ', 'รับสิทธิ์สมาชิกเต็มรูปแบบ'].map((t, i) => (
-          <div key={i} className="flex items-center gap-3 text-gray-700 py-2">
+          <div key={i} className="flex items-center gap-2 py-1.5">
             <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-            <span className="text-sm">{t}</span>
+            <span className="text-sm text-gray-700">{t}</span>
           </div>
         ))}
       </div>
@@ -175,9 +182,13 @@ export default function RegisterPage() {
         </button>
         <div className="flex-1">
           <div className="font-bold text-lg">ลงทะเบียนสมาชิก</div>
-          <div className="text-xs opacity-80">
-            ขั้นตอนที่ {step} จาก 4 &nbsp;
-            {isSupabaseReady ? '🟢 Supabase' : '🟡 Mock'}
+          <div className="flex items-center gap-1.5 text-xs opacity-90">
+            <span>ขั้นตอนที่ {step} จาก 4</span>
+            <span>•</span>
+            {isSupabaseReady
+              ? <><Wifi className="w-3 h-3" /><span>Supabase</span></>
+              : <><WifiOff className="w-3 h-3" /><span>Mock mode</span></>
+            }
           </div>
         </div>
         <div className="flex gap-1">
@@ -187,20 +198,30 @@ export default function RegisterPage() {
         </div>
       </div>
 
-      {/* Step 1 — choose method */}
+      {/* No-Supabase warning banner */}
+      {!isSupabaseReady && (
+        <div className="mx-5 mt-4 bg-amber-50 border-2 border-amber-300 rounded-xl p-3">
+          <div className="flex items-start gap-2">
+            <WifiOff className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-bold text-amber-800">ไม่มี Supabase — Mock mode</p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                ข้อมูลจะ<strong>ไม่</strong>ถูกบันทึกจริง ต้องตั้ง VITE_SUPABASE_URL
+                และ VITE_SUPABASE_ANON_KEY ใน Vercel แล้ว Redeploy
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Step 1 */}
       {step === 1 && (
         <div className="p-5 space-y-4">
           <p className="font-bold text-base text-gray-800">เลือกวิธีสมัคร</p>
-          {!isSupabaseReady && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-amber-700">ไม่พบ Supabase — ข้อมูลจะถูกบันทึกแบบ Mock เท่านั้น</p>
-            </div>
-          )}
           {[
-            { method: 'ocr' as const, Icon: FileText, label: 'มีบิลจากโรงงาน', sub: 'อนุมัติอัตโนมัติ ⚡', bg: 'bg-emerald-50' },
-            { method: 'manual' as const, Icon: User, label: 'สมาชิกใหม่', sub: 'รอ Admin อนุมัติ ⏳', bg: 'bg-blue-50' },
-          ].map(({ method: m, Icon, label, sub, bg }) => (
+            { m: 'ocr' as const, Icon: FileText, bg: 'bg-emerald-50', label: 'มีบิลจากโรงงาน', sub: 'อนุมัติอัตโนมัติ ⚡' },
+            { m: 'manual' as const, Icon: User, bg: 'bg-blue-50', label: 'สมาชิกใหม่', sub: 'รอ Admin อนุมัติ ⏳' },
+          ].map(({ m, Icon, bg, label, sub }) => (
             <div key={m} onClick={() => { setMethod(m); setStep(2) }}
               className="bg-white rounded-2xl p-5 flex items-center gap-4 cursor-pointer shadow-sm hover:shadow-md transition-all active:scale-[.98]">
               <div className={`w-14 h-14 ${bg} rounded-xl flex items-center justify-center flex-shrink-0`}>
@@ -236,11 +257,7 @@ export default function RegisterPage() {
             <label className="bg-gradient-to-br from-emerald-900 to-emerald-950 rounded-2xl h-52 flex flex-col items-center justify-center gap-3 border-2 border-dashed border-emerald-500 cursor-pointer hover:border-emerald-400 transition-colors overflow-hidden">
               {ocrPreview
                 ? <img src={ocrPreview} className="w-full h-full object-cover" />
-                : <>
-                  <Camera className="w-12 h-12 text-emerald-400" />
-                  <div className="text-emerald-300 text-base font-medium">กดเพื่อถ่ายรูปบิล</div>
-                  <div className="text-emerald-400 text-sm">หรือเลือกจากอัลบั้ม</div>
-                </>}
+                : <><Camera className="w-12 h-12 text-emerald-400" /><p className="text-emerald-300 font-medium">กดเพื่อถ่ายรูปบิล</p><p className="text-emerald-400 text-sm">หรือเลือกจากอัลบั้ม</p></>}
               <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleOcrPhoto} />
             </label>
           )}
@@ -256,21 +273,23 @@ export default function RegisterPage() {
         <div className="p-5 space-y-4">
           <div className="flex items-center gap-2">
             <User className="w-5 h-5 text-emerald-600" />
-            <p className="font-bold text-base text-gray-800">กรอกข้อมูล</p>
+            <p className="font-bold text-base text-gray-800">กรอกข้อมูลสมาชิก</p>
           </div>
           {[
             { field: 'name', label: 'ชื่อ-นามสกุล *', ph: 'กรอกชื่อ-นามสกุล' },
-            { field: 'phone', label: 'เบอร์โทร *', ph: '08x-xxx-xxxx' },
-            { field: 'idcard', label: 'เลขบัตร ปชช.', ph: '0-0000-00000-00-0' },
+            { field: 'phone', label: 'เบอร์โทรศัพท์ *', ph: '08x-xxx-xxxx' },
+            { field: 'idcard', label: 'เลขบัตรประชาชน', ph: '0-0000-00000-00-0' },
             { field: 'village', label: 'หมู่บ้าน', ph: 'บ้าน...' },
             { field: 'district', label: 'อำเภอ', ph: 'อำเภอ...' },
           ].map(({ field, label, ph }) => (
             <div key={field}>
               <label className="text-sm text-gray-600 font-medium block mb-1.5">{label}</label>
-              <input value={form[field as keyof typeof form]}
+              <input
+                value={form[field as keyof typeof form]}
                 onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
                 placeholder={ph}
-                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3.5 text-sm outline-none focus:border-emerald-500 transition-colors" />
+                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3.5 text-sm outline-none focus:border-emerald-500 transition-colors"
+              />
             </div>
           ))}
           <button onClick={() => setStep(3)}
@@ -293,16 +312,11 @@ export default function RegisterPage() {
                 <FileText className="w-6 h-6 text-amber-600" />
               </div>
               <div>
-                <div className="text-xs text-amber-700 font-medium">ข้อมูลที่จะส่ง</div>
+                <div className="text-xs text-amber-700 font-medium">ข้อมูลที่จะบันทึก</div>
                 <div className="text-lg font-bold text-gray-900">{form.name || 'ไม่ได้ระบุชื่อ'}</div>
               </div>
             </div>
-            {[
-              ['เบอร์โทร', form.phone || '-'],
-              ['เลขบัตร', form.idcard || '-'],
-              ['อำเภอ', form.district || '-'],
-              ['หมู่บ้าน', form.village || '-'],
-            ].map(([l, v]) => (
+            {[['เบอร์โทร', form.phone || '-'], ['เลขบัตร', form.idcard || '-'], ['อำเภอ', form.district || '-'], ['หมู่บ้าน', form.village || '-']].map(([l, v]) => (
               <div key={l} className="flex justify-between py-2 border-b border-amber-100 last:border-0">
                 <span className="text-sm text-gray-500">{l}</span>
                 <span className="text-sm font-semibold text-gray-900">{v}</span>
@@ -311,7 +325,7 @@ export default function RegisterPage() {
           </div>
           <div className="bg-blue-50 rounded-xl p-4 flex gap-3 text-sm text-blue-700">
             <AlertCircle className="w-5 h-5 flex-shrink-0" />
-            <span>ตรวจสอบข้อมูลให้ถูกต้องก่อนกดถัดไปนะคะ</span>
+            <span>ตรวจสอบข้อมูลให้ถูกต้องก่อนกดถัดไป</span>
           </div>
           <button onClick={() => setStep(4)}
             className="w-full bg-emerald-600 text-white rounded-xl py-4 font-bold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2">
@@ -320,7 +334,7 @@ export default function RegisterPage() {
         </div>
       )}
 
-      {/* Step 4 — Photo + GPS */}
+      {/* Step 4 — Photo + GPS + Submit */}
       {step === 4 && (
         <div className="p-5 space-y-4">
           <div className="flex items-center gap-2">
@@ -329,17 +343,21 @@ export default function RegisterPage() {
           </div>
 
           {err && (
-            <div className="bg-red-50 rounded-xl p-4 text-red-700 text-sm flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 flex-shrink-0" />{err}
+            <div className="bg-red-50 border-2 border-red-300 rounded-xl p-4 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-bold text-red-700">บันทึกไม่สำเร็จ</p>
+                <p className="text-sm text-red-600 mt-0.5 whitespace-pre-line">{err}</p>
+              </div>
             </div>
           )}
 
           {saving && (
             <div className="fixed inset-0 bg-black/60 flex flex-col items-center justify-center z-50">
               <RefreshCw className="w-12 h-12 text-white animate-spin mb-4" />
-              <div className="text-white text-lg font-bold">
-                กำลังบันทึก{isSupabaseReady ? ' ไปยัง Supabase' : ' (Mock)'}...
-              </div>
+              <p className="text-white text-lg font-bold">
+                กำลังบันทึก{isSupabaseReady ? ' ลง Supabase...' : ' (Mock)...'}
+              </p>
             </div>
           )}
 
@@ -347,16 +365,12 @@ export default function RegisterPage() {
             {plotPreview ? (
               <>
                 <img src={plotPreview} alt="แปลง" className="w-full rounded-2xl block" />
-                <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-sm text-center py-2.5 flex items-center justify-center gap-2">
+                <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-sm text-center py-2.5 flex items-center justify-center gap-2">
                   <Camera className="w-4 h-4" /> เปลี่ยนรูป
                 </div>
               </>
             ) : (
-              <>
-                <ImagePlus className="w-12 h-12 text-emerald-400" />
-                <div className="text-emerald-300 text-base font-medium">ถ่ายรูปแปลงข้าวโพด</div>
-                <div className="text-emerald-400 text-sm">ระบบจะดึงพิกัดจากรูปอัตโนมัติ</div>
-              </>
+              <><ImagePlus className="w-12 h-12 text-emerald-400" /><p className="text-emerald-300 font-medium">ถ่ายรูปแปลงข้าวโพด</p><p className="text-emerald-400 text-sm">ระบบจะดึงพิกัดจากรูปอัตโนมัติ</p></>
             )}
             <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePlotPhoto} />
           </label>
@@ -376,20 +390,20 @@ export default function RegisterPage() {
                 </div>
                 <div className="flex-1">
                   <div className="text-xs text-emerald-700 font-medium">
-                    {gpsSource === 'exif' ? '✨ พิกัดจากรูปถ่าย' : '📡 พิกัดจาก GPS มือถือ'}
+                    {gpsSource === 'exif' ? '✨ พิกัดจากรูปถ่าย (EXIF)' : '📡 พิกัดจาก GPS มือถือ'}
                   </div>
-                  <div className="text-sm font-mono text-gray-900 font-semibold">
+                  <div className="text-sm font-mono text-gray-900">
                     {coords.lat.toFixed(6)}°N, {coords.lng.toFixed(6)}°E
                   </div>
                 </div>
                 <button onClick={requestGPS}
-                  className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-400 rounded-lg px-3 py-1.5 flex items-center gap-1 hover:bg-emerald-100">
+                  className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-400 rounded-lg px-3 py-1.5 flex items-center gap-1">
                   <RefreshCw className="w-3 h-3" /> รีเฟรช
                 </button>
               </div>
               <a href={`https://www.google.com/maps?q=${coords.lat},${coords.lng}`}
                 target="_blank" rel="noreferrer"
-                className="flex items-center justify-center gap-2 text-emerald-700 text-sm mt-2 font-medium">
+                className="flex items-center justify-center gap-2 text-emerald-700 text-sm mt-1 font-medium">
                 🗺️ เปิดดูใน Google Maps
               </a>
             </div>
@@ -403,8 +417,11 @@ export default function RegisterPage() {
           )}
 
           <button onClick={handleSubmit} disabled={!plotFile || !coords || saving}
-            className={`w-full bg-emerald-600 text-white rounded-xl py-4 font-bold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 ${(!plotFile || !coords || saving) ? 'opacity-50 cursor-not-allowed' : 'active:scale-[.98]'}`}>
-            <Check className="w-5 h-5" /> ยืนยันส่งคำขอลงทะเบียน
+            className={`w-full bg-emerald-600 text-white rounded-xl py-4 font-bold transition-colors flex items-center justify-center gap-2 ${(!plotFile || !coords || saving) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-700 active:scale-[.98]'}`}>
+            {saving
+              ? <><RefreshCw className="w-5 h-5 animate-spin" />กำลังส่งคำขอ...</>
+              : <><Check className="w-5 h-5" />ยืนยันส่งคำขอลงทะเบียน</>
+            }
           </button>
         </div>
       )}
