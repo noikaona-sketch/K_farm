@@ -4,7 +4,7 @@ import {
   ChevronLeft, Camera, FileText, User, Check,
   AlertCircle, MapPin, RefreshCw, ImagePlus, Wifi, WifiOff,
 } from 'lucide-react'
-import { useAuth } from '../../routes/AuthContext'
+import { useAuth, type RegStatus } from '../../routes/AuthContext'
 import { insertProfile, insertFarmer } from '../../lib/db'
 import { isSupabaseReady } from '../../lib/supabase'
 
@@ -53,7 +53,7 @@ function readExifCoords(file: File): Promise<{ lat: number; lng: number } | null
 }
 
 export default function RegisterPage() {
-  const { user } = useAuth()
+  const { user, login, setRegStatus } = useAuth()
   const navigate = useNavigate()
   const [step, setStep] = useState(1)
   const [method, setMethod] = useState<'ocr' | 'manual' | null>(null)
@@ -130,6 +130,16 @@ export default function RegisterPage() {
       }
 
       setInsertedFarmerId(farmerRes.data?.id ?? null)
+
+      // อัปเดต AuthContext ให้ชื่อ + สถานะเปลี่ยนทันที
+      const registeredName = form.name.trim() || user?.name || 'ไม่ระบุ'
+      login({
+        ...(user!),
+        name: registeredName,
+        registrationStatus: 'pending',
+      })
+      setRegStatus('pending')
+
       setDone(true)
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'เกิดข้อผิดพลาดไม่ทราบสาเหตุ'
