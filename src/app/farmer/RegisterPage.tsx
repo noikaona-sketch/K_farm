@@ -162,9 +162,9 @@ export default function RegisterPage() {
       login({
         ...(user!),
         name: registeredName,
-        registrationStatus: 'pending',
+        registrationStatus: 'pending_leader',
       })
-      setRegStatus('pending')
+      setRegStatus('pending_leader')
 
       setDone(true)
     } catch (e: unknown) {

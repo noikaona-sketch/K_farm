@@ -44,7 +44,16 @@ export default function LoginPage() {
     setLoading(true); setErr('')
     setTimeout(() => {
       const u = MOCK_USERS.find(u => u.role===sel && u.code===code.toUpperCase() && u.password===pw)
-      if (u) { const { password:_, ...au } = u; login(au); navigate(ROLE_HOME[u.role], { replace:true }) }
+      if (u) {
+          const { password: _, ...au } = u
+          login({
+            ...au,
+            profileId: au.id,
+            idCard: au.code ?? '',
+            registrationStatus: 'approved' as const,
+          })
+          navigate(ROLE_HOME[u.role], { replace: true })
+        }
       else { setErr('รหัสผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'); setLoading(false) }
     }, 700)
   }

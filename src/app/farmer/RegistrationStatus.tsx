@@ -40,7 +40,7 @@ export default function RegistrationStatus() {
     },
   ]
 
-  const statusConfig = {
+  const statusConfig: Record<string, { color: string; textColor: string; label: string; icon: string; desc: string }> = {
     none: {
       color: 'bg-gray-100',
       textColor: 'text-gray-600',
@@ -48,12 +48,19 @@ export default function RegistrationStatus() {
       icon: '📋',
       desc: 'กดปุ่มด้านล่างเพื่อเริ่มลงทะเบียน',
     },
-    pending: {
+    pending_leader: {
       color: 'bg-amber-50',
       textColor: 'text-amber-700',
-      label: 'รออนุมัติ',
+      label: 'รออนุมัติจากหัวหน้ากลุ่ม',
       icon: '⏳',
-      desc: 'เอกสารของท่านถูกส่งแล้ว รอ Leader และ Admin ตรวจสอบ ระบบจะแจ้งผ่าน LINE',
+      desc: 'คำขอถูกส่งแล้ว รอ Leader ในกลุ่มตรวจสอบ',
+    },
+    pending_admin: {
+      color: 'bg-orange-50',
+      textColor: 'text-orange-700',
+      label: 'รออนุมัติจาก Admin',
+      icon: '🔍',
+      desc: 'Leader อนุมัติแล้ว รอ Admin ตรวจสอบขั้นสุดท้าย',
     },
     approved: {
       color: 'bg-emerald-50',
@@ -70,7 +77,7 @@ export default function RegistrationStatus() {
       desc: 'เอกสารไม่ผ่านการตรวจสอบ กรุณาติดต่อพี่เลี้ยงของท่าน',
     },
   }
-  const cfg = statusConfig[status]
+  const cfg = statusConfig[status] ?? statusConfig['pending_leader']
 
   return (
     <div className="min-h-screen bg-gray-50">
