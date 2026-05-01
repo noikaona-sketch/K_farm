@@ -13,7 +13,7 @@ const MOCK_USERS = [
 ]
 
 const ROLE_HOME: Record<AppRole, string> = {
-  farmer:'/farmer', leader:'/leader', inspector:'/inspector', admin:'/admin'
+  member:'/farmer', farmer:'/farmer', leader:'/leader', inspector:'/inspector', admin:'/admin'
 }
 
 const ROLES = [
@@ -24,7 +24,7 @@ const ROLES = [
 ]
 
 const BG: Record<AppRole, string> = {
-  farmer:'bg-emerald-600', leader:'bg-amber-500', inspector:'bg-blue-600', admin:'bg-purple-700'
+  member:'bg-emerald-600', farmer:'bg-emerald-600', leader:'bg-amber-500', inspector:'bg-blue-600', admin:'bg-purple-700'
 }
 
 export default function LoginPage() {
