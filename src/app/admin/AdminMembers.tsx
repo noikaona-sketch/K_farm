@@ -1,57 +1,49 @@
-import React, { useEffect, useState, useCallback } from 'react'
-import {
-  RefreshCw, Search, Check, X, ChevronDown, ChevronUp,
-  Phone, AlertCircle, Wifi, WifiOff,
-} from 'lucide-react'
+import { useEffect, useState, useCallback } from 'react'
 import {
   fetchAdminMembers, approveMember, rejectMember, updateRoleGrade,
   type AdminMemberRow,
 } from '../../lib/db'
 import { isSupabaseReady } from '../../lib/supabase'
+import { RefreshCw, Search, Wifi, WifiOff } from 'lucide-react'
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
-const STATUS_CFG: Record<string, { label: string; bg: string; text: string }> = {
-  pending_leader: { label: 'รอ Leader',  bg: 'bg-amber-100',   text: 'text-amber-700' },
-  pending_admin:  { label: 'รอ Admin',   bg: 'bg-orange-100',  text: 'text-orange-700' },
-  approved:       { label: 'อนุมัติแล้ว', bg: 'bg-emerald-100', text: 'text-emerald-700' },
-  rejected:       { label: 'ปฏิเสธ',    bg: 'bg-red-100',     text: 'text-red-700' },
+const STATUS_CFG: Record<string, { label: string; dot: string }> = {
+  pending_leader: { label: 'รอ Leader',    dot: 'bg-amber-400' },
+  pending_admin:  { label: 'รอ Admin',     dot: 'bg-orange-400' },
+  approved:       { label: 'อนุมัติแล้ว', dot: 'bg-emerald-500' },
+  rejected:       { label: 'ปฏิเสธ',      dot: 'bg-red-400' },
 }
 
-const ROLE_OPTIONS = ['member', 'farmer', 'leader', 'inspector', 'admin']
-const GRADE_OPTIONS = ['', 'A', 'B', 'C', 'D']
+const ROLE_OPTIONS  = ['member','farmer','leader','inspector','admin']
+const GRADE_OPTIONS = ['','A','B','C','D']
 
-function farmerOf(row: AdminMemberRow) {
-  return row.farmers?.[0] ?? null
-}
+function farmer0(row: AdminMemberRow) { return row.farmers?.[0] ?? null }
 
 // ── component ──────────────────────────────────────────────────────────────────
 
-export default function AdminMembers() {
-  const [rows, setRows]       = useState<AdminMemberRow[]>([])
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch]   = useState('')
-  const [filter, setFilter]   = useState<'all' | 'pending' | 'approved' | 'rejected'>('all')
-  const [expanded, setExpanded]       = useState<string | null>(null)
-  const [actionNote, setActionNote]   = useState<Record<string, string>>({})
-  const [acting, setActing]           = useState<string | null>(null)  // profileId being processed
-  const [toast, setToast]             = useState<{ ok: boolean; msg: string } | null>(null)
-  // role/grade edit state per row
-  const [editRole, setEditRole]   = useState<Record<string, string>>({})
-  const [editGrade, setEditGrade] = useState<Record<string, string>>({})
+export default function MembersPage() {
+  const [data, setData]         = useState<AdminMemberRow[]>([])
+  const [loading, setLoading]   = useState(true)
+  const [search, setSearch]     = useState('')
+  const [filter, setFilter]     = useState<'all'|'pending'|'approved'|'rejected'>('all')
+  const [acting, setActing]     = useState<string|null>(null)
+  const [toast, setToast]       = useState<{ok:boolean;msg:string}|null>(null)
+  // inline role/grade edit
+  const [editRole,  setEditRole]  = useState<Record<string,string>>({})
+  const [editGrade, setEditGrade] = useState<Record<string,string>>({})
 
-  const showToast = (ok: boolean, msg: string) => {
-    setToast({ ok, msg })
-    setTimeout(() => setToast(null), 4000)
+  const flash = (ok:boolean, msg:string) => {
+    setToast({ok,msg}); setTimeout(()=>setToast(null),4000)
   }
 
   const load = useCallback(async () => {
-    setLoading(true)
     try {
-      const data = await fetchAdminMembers()
-      setRows(data)
-    } catch (e: unknown) {
-      showToast(false, e instanceof Error ? e.message : 'โหลดข้อมูลไม่สำเร็จ')
+      const res = await fetchAdminMembers()
+      setData(res || [])
+    } catch (e) {
+      console.error(e)
+      flash(false, 'โหลดข้อมูลไม่สำเร็จ')
     } finally {
       setLoading(false)
     }
@@ -59,266 +51,265 @@ export default function AdminMembers() {
 
   useEffect(() => { load() }, [load])
 
-  const handleApprove = async (row: AdminMemberRow) => {
-    setActing(row.id)
-    try {
-      await approveMember(row.id)
-      showToast(true, `✅ อนุมัติ ${row.full_name} สำเร็จ${isSupabaseReady ? ' (Supabase)' : ' (Mock)'}`)
-      await load()
-    } catch (e: unknown) {
-      showToast(false, e instanceof Error ? e.message : 'อนุมัติไม่สำเร็จ')
-    } finally { setActing(null) }
-  }
-
-  const handleReject = async (row: AdminMemberRow) => {
-    setActing(row.id)
-    try {
-      await rejectMember(row.id)
-      showToast(true, `❌ ปฏิเสธ ${row.full_name} แล้ว`)
-      await load()
-    } catch (e: unknown) {
-      showToast(false, e instanceof Error ? e.message : 'ปฏิเสธไม่สำเร็จ')
-    } finally { setActing(null) }
-  }
-
-  const handleRoleGrade = async (row: AdminMemberRow) => {
-    const role  = editRole[row.id]  ?? row.role
-    const grade = editGrade[row.id] ?? row.grade ?? ''
-    setActing(row.id)
-    try {
-      await updateRoleGrade(row.id, role, grade)
-      showToast(true, `🔐 อัปเดต ${row.full_name} → role: ${role}, grade: ${grade || '-'}`)
-      await load()
-    } catch (e: unknown) {
-      showToast(false, e instanceof Error ? e.message : 'อัปเดตไม่สำเร็จ')
-    } finally { setActing(null) }
+  const act = async (id:string, fn:()=>Promise<void>, msg:string) => {
+    setActing(id)
+    try { await fn(); flash(true,msg); await load() }
+    catch(e) { flash(false, e instanceof Error ? e.message : 'ไม่สำเร็จ') }
+    finally { setActing(null) }
   }
 
   // filter + search
-  const displayed = rows.filter(r => {
-    const f = farmerOf(r)
-    if (filter === 'pending')  return f?.status === 'pending_leader' || f?.status === 'pending_admin'
-    if (filter === 'approved') return f?.status === 'approved'
-    if (filter === 'rejected') return f?.status === 'rejected'
-    return true
-  }).filter(r =>
-    r.full_name.toLowerCase().includes(search.toLowerCase()) ||
-    r.id_card.includes(search) ||
-    r.phone.includes(search)
-  )
+  const rows = data
+    .filter(u => {
+      const s = farmer0(u)?.status ?? ''
+      if (filter==='pending')  return s==='pending_leader'||s==='pending_admin'
+      if (filter==='approved') return s==='approved'
+      if (filter==='rejected') return s==='rejected'
+      return true
+    })
+    .filter(u =>
+      u.full_name.toLowerCase().includes(search.toLowerCase()) ||
+      u.id_card.includes(search) || u.phone.includes(search)
+    )
 
-  const pendingCount = rows.filter(r => {
-    const s = farmerOf(r)?.status ?? ''
-    return s === 'pending_leader' || s === 'pending_admin'
+  const pendingCount = data.filter(u=>{
+    const s=farmer0(u)?.status??''
+    return s==='pending_leader'||s==='pending_admin'
   }).length
 
+  if (loading) return (
+    <div className="flex items-center justify-center py-24 gap-3 text-gray-500">
+      <RefreshCw className="w-6 h-6 animate-spin" />กำลังโหลด...
+    </div>
+  )
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
 
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">สมาชิก / อนุมัติสมาชิก</h1>
-          <div className="flex items-center gap-1.5 mt-1">
+          <h1 className="text-xl font-bold text-gray-900">สมาชิก / อนุมัติสมาชิก</h1>
+          <div className="flex items-center gap-1.5 mt-0.5 text-sm">
             {isSupabaseReady
-              ? <><Wifi className="w-3.5 h-3.5 text-emerald-600" /><span className="text-sm text-emerald-600">Supabase: profiles + farmers</span></>
-              : <><WifiOff className="w-3.5 h-3.5 text-amber-500" /><span className="text-sm text-amber-600">Mock data</span></>}
+              ? <><Wifi className="w-3.5 h-3.5 text-emerald-600"/><span className="text-emerald-600">Supabase</span></>
+              : <><WifiOff className="w-3.5 h-3.5 text-amber-500"/><span className="text-amber-600">Mock data</span></>}
+            <span className="text-gray-400">• {data.length} รายการ</span>
           </div>
         </div>
-        <button onClick={load} disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors shadow-sm disabled:opacity-50">
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />รีโหลด
+        <button onClick={()=>{setLoading(true);load()}}
+          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 shadow-sm">
+          <RefreshCw className="w-4 h-4"/>รีโหลด
         </button>
       </div>
 
       {/* Toast */}
       {toast && (
-        <div className={`border-2 rounded-xl px-4 py-3 flex items-center gap-2 text-sm font-semibold
-          ${toast.ok ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'bg-red-50 border-red-300 text-red-700'}`}>
-          {toast.ok ? <Check className="w-4 h-4 flex-shrink-0" /> : <AlertCircle className="w-4 h-4 flex-shrink-0" />}
-          {toast.msg}
-          <button onClick={() => setToast(null)} className="ml-auto opacity-60 hover:opacity-100">✕</button>
+        <div className={`rounded-xl px-4 py-3 flex items-center gap-2 text-sm font-medium border
+          ${toast.ok
+            ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+            : 'bg-red-50 border-red-300 text-red-700'}`}>
+          <span>{toast.ok ? '✅' : '❌'}</span>{toast.msg}
+          <button onClick={()=>setToast(null)} className="ml-auto opacity-60 hover:opacity-100 text-lg leading-none">×</button>
         </div>
       )}
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {([
-          ['all',      'ทั้งหมด',       rows.length,    'border-gray-200 bg-gray-50 text-gray-700'],
-          ['pending',  'รออนุมัติ',     pendingCount,   'border-amber-200 bg-amber-50 text-amber-700'],
-          ['approved', 'อนุมัติแล้ว',   rows.filter(r => farmerOf(r)?.status === 'approved').length, 'border-emerald-200 bg-emerald-50 text-emerald-700'],
-          ['rejected', 'ปฏิเสธ',       rows.filter(r => farmerOf(r)?.status === 'rejected').length, 'border-red-200 bg-red-50 text-red-700'],
-        ] as [typeof filter, string, number, string][]).map(([k, label, count, cls]) => (
-          <button key={k} onClick={() => setFilter(k)}
-            className={`border-2 rounded-2xl p-4 text-center transition-all cursor-pointer hover:opacity-80 ${cls}
-              ${filter === k ? 'ring-2 ring-offset-1 ring-current' : ''}`}>
-            <div className="text-2xl font-bold">{loading ? '…' : count}</div>
-            <div className="text-sm font-semibold mt-0.5">{label}</div>
-          </button>
-        ))}
-      </div>
 
       {/* Pending alert */}
       {pendingCount > 0 && (
-        <div onClick={() => setFilter('pending')}
-          className="bg-red-50 border-2 border-red-300 rounded-2xl p-4 flex items-center gap-3 cursor-pointer hover:bg-red-100 transition-colors">
-          <div className="w-10 h-10 bg-red-500 rounded-xl flex items-center justify-center text-white font-bold flex-shrink-0">{pendingCount}</div>
+        <button onClick={()=>setFilter('pending')}
+          className="w-full flex items-center gap-3 bg-red-50 border-2 border-red-300 rounded-2xl px-4 py-3 hover:bg-red-100 transition-colors text-left">
+          <span className="w-8 h-8 rounded-full bg-red-500 text-white font-bold flex items-center justify-center text-sm flex-shrink-0">{pendingCount}</span>
           <div>
-            <div className="font-bold text-red-800">มีคำขอสมัครรออนุมัติ {pendingCount} ราย</div>
-            <div className="text-sm text-red-600">กดเพื่อกรองดูเฉพาะรายที่รออนุมัติ →</div>
+            <div className="font-bold text-red-800 text-sm">มีคำขอสมัครรออนุมัติ {pendingCount} ราย</div>
+            <div className="text-xs text-red-600">กดกรองดูเฉพาะรายที่รออนุมัติ →</div>
           </div>
+        </button>
+      )}
+
+      {/* Filter tabs + search */}
+      <div className="flex flex-wrap gap-2">
+        {([
+          ['all','ทั้งหมด',data.length],
+          ['pending','รออนุมัติ',pendingCount],
+          ['approved','อนุมัติแล้ว',data.filter(u=>farmer0(u)?.status==='approved').length],
+          ['rejected','ปฏิเสธ',data.filter(u=>farmer0(u)?.status==='rejected').length],
+        ] as [typeof filter,string,number][]).map(([k,label,n])=>(
+          <button key={k} onClick={()=>setFilter(k)}
+            className={`px-4 py-1.5 rounded-xl text-sm font-semibold border transition-all
+              ${filter===k
+                ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}>
+            {label} <span className="opacity-70">({n})</span>
+          </button>
+        ))}
+        <div className="relative flex-1 min-w-40">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400"/>
+          <input value={search} onChange={e=>setSearch(e.target.value)}
+            placeholder="ค้นหาชื่อ บัตร เบอร์..."
+            className="w-full pl-8 pr-3 py-1.5 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-emerald-500"/>
+        </div>
+      </div>
+
+      {/* Empty */}
+      {rows.length === 0 && (
+        <div className="text-center py-16 text-gray-400">
+          <div className="text-5xl mb-3">👥</div>
+          <p className="font-medium">ยังไม่มีสมาชิก</p>
         </div>
       )}
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <input value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="ค้นหาชื่อ เลขบัตร หรือเบอร์โทร..."
-          className="w-full pl-10 pr-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-emerald-500" />
-      </div>
+      {/* Table (desktop) */}
+      {rows.length > 0 && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100 text-gray-500 font-semibold text-xs uppercase tracking-wide">
+                  <th className="text-left px-4 py-3">ชื่อ</th>
+                  <th className="text-left px-3 py-3">บัตรประชาชน</th>
+                  <th className="text-left px-3 py-3">โทร</th>
+                  <th className="text-left px-3 py-3">พื้นที่</th>
+                  <th className="text-center px-3 py-3">Role</th>
+                  <th className="text-center px-3 py-3">Grade</th>
+                  <th className="text-center px-3 py-3">Status</th>
+                  <th className="text-center px-3 py-3">LINE</th>
+                  <th className="text-center px-4 py-3">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {rows.map(u => {
+                  const f   = farmer0(u)
+                  const st  = STATUS_CFG[f?.status??''] ?? {label:f?.status??'-', dot:'bg-gray-300'}
+                  const isA = acting === u.id
 
-      {/* List */}
-      {loading ? (
-        <div className="flex justify-center py-16">
-          <RefreshCw className="w-8 h-8 text-emerald-600 animate-spin" />
-        </div>
-      ) : displayed.length === 0 ? (
-        <div className="text-center py-16 text-gray-400">
-          <div className="text-5xl mb-3">👥</div>
-          <p className="font-semibold">ไม่พบข้อมูล</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {displayed.map(row => {
-            const farmer    = farmerOf(row)
-            const status    = farmer?.status ?? 'unknown'
-            const stCfg     = STATUS_CFG[status] ?? { label: status, bg: 'bg-gray-100', text: 'text-gray-600' }
-            const isExp     = expanded === row.id
-            const isActing  = acting === row.id
-            const isPending = status === 'pending_leader' || status === 'pending_admin'
+                  return (
+                    <tr key={u.id} className="hover:bg-gray-50/60 transition-colors">
 
-            return (
-              <div key={row.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                {/* Card header */}
-                <button className="w-full p-4 text-left hover:bg-gray-50 transition-colors"
-                  onClick={() => setExpanded(isExp ? null : row.id)}>
-                  <div className="flex items-start gap-3">
-                    <div className="w-11 h-11 rounded-full bg-emerald-100 flex items-center justify-center font-bold text-emerald-700 text-base flex-shrink-0">
-                      {row.full_name.charAt(0)}
-                    </div>
-                    <div className="flex-1 min-w-0 text-left">
-                      <div className="font-bold text-gray-900">{row.full_name}</div>
-                      <div className="text-xs text-gray-500 mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
-                        <span className="font-mono">{row.id_card}</span>
-                        <span>{row.phone}</span>
-                        {farmer?.district && <span>📍 {farmer.district}</span>}
-                      </div>
-                      <div className="text-xs text-gray-400 mt-0.5">
-                        {new Date(row.created_at).toLocaleDateString('th-TH', {
-                          year: 'numeric', month: 'short', day: 'numeric',
-                          hour: '2-digit', minute: '2-digit',
-                        })}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${stCfg.bg} ${stCfg.text}`}>
-                        {stCfg.label}
-                      </span>
-                      {isExp
-                        ? <ChevronUp className="w-4 h-4 text-gray-400" />
-                        : <ChevronDown className="w-4 h-4 text-gray-400" />}
-                    </div>
-                  </div>
-                </button>
-
-                {/* Expanded detail */}
-                {isExp && (
-                  <div className="border-t border-gray-100 p-4 bg-gray-50 space-y-4">
-
-                    {/* Info grid */}
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      {[
-                        ['role ปัจจุบัน', row.role],
-                        ['grade', row.grade || '-'],
-                        ['LINE verify', row.line_verify_status || '-'],
-                        ['จังหวัด', farmer?.province || '-'],
-                        ['อำเภอ', farmer?.district || '-'],
-                        ['หมู่บ้าน', farmer?.village || '-'],
-                        ['ธนาคาร', farmer?.bank_name || '-'],
-                        ['เลขบัญชี', farmer?.bank_account_no || '-'],
-                        ['ชื่อบัญชี', farmer?.bank_account_name || '-'],
-                      ].map(([l, v]) => (
-                        <div key={l} className="bg-white rounded-xl p-2.5">
-                          <div className="text-xs text-gray-400">{l}</div>
-                          <div className="font-semibold text-gray-800 truncate">{v}</div>
+                      {/* ชื่อ */}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 font-bold text-sm flex items-center justify-center flex-shrink-0">
+                            {u.full_name.charAt(0)}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-gray-900 whitespace-nowrap">{u.full_name}</div>
+                            <div className="text-xs text-gray-400">
+                              {new Date(u.created_at).toLocaleDateString('th-TH',{month:'short',day:'numeric',year:'2-digit'})}
+                            </div>
+                          </div>
                         </div>
-                      ))}
-                    </div>
+                      </td>
 
-                    {/* Phone call */}
-                    <a href={`tel:${row.phone}`}
-                      className="flex items-center justify-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 rounded-xl py-2.5 text-sm font-semibold hover:bg-blue-100 transition-colors">
-                      <Phone className="w-4 h-4" />โทร {row.phone}
-                    </a>
+                      {/* บัตร */}
+                      <td className="px-3 py-3 font-mono text-xs text-gray-600 whitespace-nowrap">{u.id_card}</td>
 
-                    {/* Approve / Reject */}
-                    {isPending && (
-                      <div className="space-y-2">
-                        <textarea
-                          rows={2}
-                          placeholder="หมายเหตุสำหรับผู้สมัคร (ถ้ามี)"
-                          value={actionNote[row.id] ?? ''}
-                          onChange={e => setActionNote(n => ({ ...n, [row.id]: e.target.value }))}
-                          className="w-full border-2 border-gray-200 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:border-emerald-500"
-                        />
-                        <div className="flex gap-3">
-                          <button onClick={() => handleReject(row)} disabled={isActing}
-                            className={`flex-1 border-2 border-red-300 text-red-600 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors
-                              ${isActing ? 'opacity-60 cursor-not-allowed' : 'hover:bg-red-50'}`}>
-                            {isActing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />}
-                            ปฏิเสธ
+                      {/* โทร */}
+                      <td className="px-3 py-3">
+                        <a href={`tel:${u.phone}`} className="text-blue-600 hover:underline font-mono text-xs whitespace-nowrap">
+                          {u.phone}
+                        </a>
+                      </td>
+
+                      {/* พื้นที่ */}
+                      <td className="px-3 py-3 text-gray-600 text-xs whitespace-nowrap">
+                        {f?.province && f?.district
+                          ? `${f.province} / ${f.district}`
+                          : <span className="text-gray-300">-</span>}
+                      </td>
+
+                      {/* Role — inline edit */}
+                      <td className="px-3 py-3 text-center">
+                        <select
+                          value={editRole[u.id] ?? u.role}
+                          onChange={e=>setEditRole(r=>({...r,[u.id]:e.target.value}))}
+                          className="border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:border-emerald-500 w-24">
+                          {ROLE_OPTIONS.map(r=><option key={r} value={r}>{r}</option>)}
+                        </select>
+                      </td>
+
+                      {/* Grade — inline edit */}
+                      <td className="px-3 py-3 text-center">
+                        <select
+                          value={editGrade[u.id] ?? (u.grade??'')}
+                          onChange={e=>setEditGrade(g=>({...g,[u.id]:e.target.value}))}
+                          className="border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:border-emerald-500 w-16">
+                          {GRADE_OPTIONS.map(g=><option key={g} value={g}>{g||'-'}</option>)}
+                        </select>
+                      </td>
+
+                      {/* Status */}
+                      <td className="px-3 py-3 text-center">
+                        <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                          <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${st.dot}`}/>
+                          <span className="text-xs font-medium text-gray-700">{st.label}</span>
+                        </div>
+                      </td>
+
+                      {/* LINE */}
+                      <td className="px-3 py-3 text-center text-xs">
+                        {u.line_verify_status === 'verified'
+                          ? <span className="text-emerald-600 font-semibold">✓ ยืนยัน</span>
+                          : <span className="text-gray-400">{u.line_verify_status || '-'}</span>}
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1.5 justify-center flex-wrap">
+                          {/* อนุมัติ */}
+                          <button
+                            onClick={() => act(u.id, ()=>approveMember(u.id), `✅ อนุมัติ ${u.full_name}`)}
+                            disabled={isA || f?.status==='approved'}
+                            title="อนุมัติ"
+                            className={`w-7 h-7 rounded-lg flex items-center justify-center text-sm font-bold transition-colors
+                              ${f?.status==='approved'
+                                ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                                : isA ? 'bg-emerald-100 text-emerald-300 cursor-wait'
+                                : 'bg-emerald-500 text-white hover:bg-emerald-600'}`}>
+                            {isA ? '…' : '✔'}
                           </button>
-                          <button onClick={() => handleApprove(row)} disabled={isActing}
-                            className={`flex-1 bg-emerald-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors
-                              ${isActing ? 'opacity-60 cursor-not-allowed' : 'hover:bg-emerald-700'}`}>
-                            {isActing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                            อนุมัติ
+
+                          {/* ปฏิเสธ */}
+                          <button
+                            onClick={() => act(u.id, ()=>rejectMember(u.id), `❌ ปฏิเสธ ${u.full_name}`)}
+                            disabled={isA || f?.status==='rejected'}
+                            title="ปฏิเสธ"
+                            className={`w-7 h-7 rounded-lg flex items-center justify-center text-sm font-bold transition-colors
+                              ${f?.status==='rejected'
+                                ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                                : isA ? 'bg-red-100 text-red-300 cursor-wait'
+                                : 'bg-red-500 text-white hover:bg-red-600'}`}>
+                            ✖
+                          </button>
+
+                          {/* บันทึก Role/Grade */}
+                          <button
+                            onClick={() => act(u.id,
+                              ()=>updateRoleGrade(u.id,
+                                editRole[u.id]??u.role,
+                                editGrade[u.id]??(u.grade??'')),
+                              `🔐 อัปเดต ${u.full_name}`)}
+                            disabled={isA}
+                            title="บันทึก Role/Grade"
+                            className={`px-2 h-7 rounded-lg text-xs font-bold whitespace-nowrap transition-colors
+                              ${isA
+                                ? 'bg-blue-100 text-blue-300 cursor-wait'
+                                : 'bg-blue-500 text-white hover:bg-blue-600'}`}>
+                            {isA ? '…' : '💾 บันทึก'}
                           </button>
                         </div>
-                      </div>
-                    )}
+                      </td>
 
-                    {/* Role / Grade editor */}
-                    <div className="border-t border-gray-200 pt-3">
-                      <div className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wide">🔐 แก้ไข Role / Grade</div>
-                      <div className="flex gap-2">
-                        <select
-                          value={editRole[row.id] ?? row.role}
-                          onChange={e => setEditRole(r => ({ ...r, [row.id]: e.target.value }))}
-                          className="flex-1 border-2 border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-500 bg-white">
-                          {ROLE_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
-                        </select>
-                        <select
-                          value={editGrade[row.id] ?? (row.grade ?? '')}
-                          onChange={e => setEditGrade(g => ({ ...g, [row.id]: e.target.value }))}
-                          className="w-24 border-2 border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-500 bg-white">
-                          {GRADE_OPTIONS.map(g => <option key={g} value={g}>{g || '(ไม่มี)'}</option>)}
-                        </select>
-                        <button onClick={() => handleRoleGrade(row)} disabled={isActing}
-                          className={`px-4 py-2 bg-gray-800 text-white rounded-xl text-sm font-bold transition-colors flex items-center gap-1
-                            ${isActing ? 'opacity-60 cursor-not-allowed' : 'hover:bg-gray-700'}`}>
-                          {isActing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : '💾'}
-                          บันทึก
-                        </button>
-                      </div>
-                    </div>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
 
-                  </div>
-                )}
-              </div>
-            )
-          })}
+          {/* Footer */}
+          <div className="px-4 py-2.5 bg-gray-50 border-t border-gray-100 text-xs text-gray-500">
+            แสดง {rows.length} จาก {data.length} รายการ
+          </div>
         </div>
       )}
     </div>
