@@ -5,7 +5,7 @@ import {
   User, CreditCard, Phone, MapPin, Building2,
 } from 'lucide-react'
 import { useAuth } from './AuthContext'
-import { registerFarmerMember } from '../lib/db'
+import { registerFarmerMember, saveProfileLineUserId } from '../lib/db'
 import { isSupabaseReady } from '../lib/supabase'
 
 const PROVINCES = ['บุรีรัมย์','สุรินทร์','ศรีสะเกษ','นครราชสีมา','ร้อยเอ็ด','อุบลราชธานี','ยโสธร','มุกดาหาร']
@@ -103,6 +103,11 @@ export default function RegisterFlow() {
       if (res.error && isSupabaseReady) throw new Error(res.error)
       setStep('สมัครสำเร็จ! ✓')
       if (res.data) {
+        const lineUserId = new URLSearchParams(window.location.search).get('line_user_id')
+          || new URLSearchParams(window.location.search).get('userId')
+        if (lineUserId) {
+          await saveProfileLineUserId(res.data.profileId, lineUserId)
+        }
         login(res.data)
         navigate('/farmer', { replace: true })
       }

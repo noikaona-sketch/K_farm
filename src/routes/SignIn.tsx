@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, CreditCard, Phone, RefreshCw, AlertCircle, Eye, EyeOff } from 'lucide-react'
 import { useAuth } from './AuthContext'
-import { loginWithIdCardPhone } from '../lib/db'
+import { loginWithIdCardPhone, saveProfileLineUserId } from '../lib/db'
 import { isSupabaseReady } from '../lib/supabase'
 
 export default function SignIn() {
@@ -35,6 +35,11 @@ export default function SignIn() {
       }
 
       login(res.data)   // persist ใน localStorage ผ่าน AuthContext
+      const lineUserId = new URLSearchParams(window.location.search).get('line_user_id')
+        || new URLSearchParams(window.location.search).get('userId')
+      if (lineUserId) {
+        await saveProfileLineUserId(res.data.profileId, lineUserId)
+      }
 
       // route ตาม role
       if (res.data.role === 'admin') navigate('/farmer', { replace: true })
