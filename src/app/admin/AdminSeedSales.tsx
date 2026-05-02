@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
 
-type Farmer = { id: string; name: string }
+type Farmer = { id: string; name: string; phone: string; national_id: string }
 
 type SeedStockLot = {
   id: string
@@ -58,9 +58,9 @@ const STOCK_STORAGE_KEY = 'kfarm_seed_stock_lots_v1'
 const SALES_STORAGE_KEY = 'kfarm_seed_sales_v1'
 
 const FARMERS: Farmer[] = [
-  { id: 'f-001', name: 'สมชาย ใจดี' },
-  { id: 'f-002', name: 'มาลัย พูนสุข' },
-  { id: 'f-003', name: 'ประยูร นครชัย' },
+  { id: 'f-001', name: 'สมชาย ใจดี', phone: '0812345678', national_id: '1100100123456' },
+  { id: 'f-002', name: 'มาลัย พูนสุข', phone: '0898765432', national_id: '1100100654321' },
+  { id: 'f-003', name: 'ประยูร นครชัย', phone: '0861112233', national_id: '1100100998877' },
 ]
 
 function loadLots(): SeedStockLot[] {
@@ -85,6 +85,16 @@ function loadSales(): SeedSale[] {
   }
 }
 
+function fetchSeedSuppliers(lots: SeedStockLot[]) {
+  return Array.from(new Map(lots.map((lot) => [lot.supplier_id, { id: lot.supplier_id, name: lot.supplier_name }])).values())
+}
+
+function fetchSeedVarietiesBySupplier(lots: SeedStockLot[], supplierId: string) {
+  return Array.from(new Map(lots
+    .filter((lot) => !supplierId || lot.supplier_id === supplierId)
+    .map((lot) => [lot.variety_id, { id: lot.variety_id, name: lot.variety_name }])).values())
+}
+
 export default function AdminSeedSales() {
   const [lots, setLots] = useState<SeedStockLot[]>(() => loadLots())
   const [sales, setSales] = useState<SeedSale[]>(() => loadSales())
@@ -97,18 +107,8 @@ export default function AdminSeedSales() {
 
   const availableLots = useMemo(() => lots.filter((lot) => lot.quantity_balance > 0), [lots])
   const selectedLot = useMemo(() => availableLots.find((lot) => lot.id === form.lot_id), [availableLots, form.lot_id])
-
-  const suppliers = useMemo(
-    () => Array.from(new Map(availableLots.map((lot) => [lot.supplier_id, { id: lot.supplier_id, name: lot.supplier_name }])).values()),
-    [availableLots]
-  )
-
-  const varieties = useMemo(
-    () => Array.from(new Map(availableLots
-      .filter((lot) => !form.supplier_id || lot.supplier_id === form.supplier_id)
-      .map((lot) => [lot.variety_id, { id: lot.variety_id, name: lot.variety_name }])).values()),
-    [availableLots, form.supplier_id]
-  )
+  const suppliers = useMemo(() => fetchSeedSuppliers(availableLots), [availableLots])
+  const varieties = useMemo(() => fetchSeedVarietiesBySupplier(availableLots, form.supplier_id), [availableLots, form.supplier_id])
 
   const filteredLots = useMemo(
     () => availableLots.filter((lot) =>
@@ -117,10 +117,15 @@ export default function AdminSeedSales() {
     [availableLots, form.supplier_id, form.variety_id]
   )
 
-  const farmerOptions = useMemo(
-    () => FARMERS.filter((f) => f.name.toLowerCase().includes(farmerSearch.toLowerCase())),
-    [farmerSearch]
-  )
+  const farmerOptions = useMemo(() => {
+    const keyword = farmerSearch.trim().toLowerCase()
+    if (!keyword) return FARMERS
+    return FARMERS.filter((f) =>
+      f.name.toLowerCase().includes(keyword)
+      || f.phone.includes(keyword)
+      || f.national_id.includes(keyword)
+    )
+  }, [farmerSearch])
 
   const quantity = Number(form.quantity || 0)
   const bagWeight = Number(form.bag_weight_kg || 0)
@@ -157,7 +162,7 @@ export default function AdminSeedSales() {
     }
 
     if (quantity > lot.quantity_balance) {
-      setError('จำนวนเกิน stock')
+      setError('จำนวนขายมากกว่ายอดคงเหลือ')
       return
     }
 
@@ -183,11 +188,11 @@ export default function AdminSeedSales() {
 
     const nextLots = lots.map((item) => {
       if (item.id !== lot.id) return item
-      const nextBalance = item.quantity_balance - quantity
+      const newBalance = item.quantity_balance - quantity
       return {
         ...item,
-        quantity_balance: nextBalance,
-        status: nextBalance === 0 ? 'sold_out' as const : 'active' as const,
+        quantity_balance: newBalance,
+        status: newBalance === 0 ? 'sold_out' as const : 'active' as const,
       }
     })
 
@@ -215,10 +220,10 @@ export default function AdminSeedSales() {
       </div>
 
       <form onSubmit={onSubmit} className="bg-white rounded-2xl border border-gray-200 p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-        <input placeholder="ค้นหาเกษตรกร" value={farmerSearch} onChange={(e) => setFarmerSearch(e.target.value)} className="border rounded-lg p-2" />
+        <input placeholder="ค้นหาเกษตรกร (ชื่อ / เบอร์ / บัตร)" value={farmerSearch} onChange={(e) => setFarmerSearch(e.target.value)} className="border rounded-lg p-2" />
         <select required value={form.farmer_id} onChange={(e) => setForm((p) => ({ ...p, farmer_id: e.target.value }))} className="border rounded-lg p-2">
           <option value="">เลือกเกษตรกร</option>
-          {farmerOptions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+          {farmerOptions.map((f) => <option key={f.id} value={f.id}>{f.name} | {f.phone}</option>)}
         </select>
         <select value={form.supplier_id} onChange={(e) => setForm((p) => ({ ...p, supplier_id: e.target.value, variety_id: '', lot_id: '' }))} className="border rounded-lg p-2">
           <option value="">เลือก Supplier</option>
@@ -252,23 +257,23 @@ export default function AdminSeedSales() {
 
         {selectedLot && (
           <div className="md:col-span-3 bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-sm grid grid-cols-2 md:grid-cols-4 gap-2">
+            <div>Lot: <b>{selectedLot.lot_no}</b></div>
             <div>คงเหลือ: <b>{selectedLot.quantity_balance}</b> ถุง</div>
             <div>kg/ถุง: <b>{selectedLot.bag_weight_kg}</b></div>
-            <div>ราคาขาย: <b>{selectedLot.sell_price_per_bag}</b></div>
-            <div>วันหมดอายุ: <b>{selectedLot.expiry_date}</b></div>
+            <div>ราคา: <b>{selectedLot.sell_price_per_bag}</b></div>
           </div>
         )}
 
         {error && <div className="md:col-span-3 text-red-600 text-sm font-semibold">{error}</div>}
 
-        <button disabled={overStock} type="submit" className="md:col-span-3 bg-green-600 disabled:bg-gray-400 text-white rounded-lg py-2 font-semibold">บันทึกการขาย</button>
+        <button disabled={overStock} type="submit" className="md:col-span-3 bg-green-600 disabled:bg-gray-400 text-white rounded-lg py-2 font-semibold">ขายเมล็ด</button>
       </form>
 
       <div className="bg-white rounded-2xl border border-gray-200 overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead className="bg-gray-50">
             <tr>
-              {['วันที่', 'เกษตรกร', 'พันธุ์', 'Lot', 'จำนวน', 'kg', 'ราคา/ถุง', 'ยอดรวม', 'สถานะ'].map((h) => (
+              {['วันที่', 'เกษตรกร', 'พันธุ์', 'Lot', 'จำนวน', 'ราคา', 'ยอดรวม'].map((h) => (
                 <th key={h} className="text-left p-3 font-semibold text-gray-700">{h}</th>
               ))}
             </tr>
@@ -281,14 +286,12 @@ export default function AdminSeedSales() {
                 <td className="p-3">{sale.variety_name}</td>
                 <td className="p-3">{sale.lot_no}</td>
                 <td className="p-3">{sale.quantity}</td>
-                <td className="p-3">{sale.total_weight_kg}</td>
                 <td className="p-3">{sale.sell_price_per_bag}</td>
                 <td className="p-3">{sale.total_amount}</td>
-                <td className="p-3">{sale.payment_status}</td>
               </tr>
             ))}
             {sales.length === 0 && (
-              <tr><td className="p-4 text-gray-500" colSpan={9}>ยังไม่มีข้อมูลการขาย</td></tr>
+              <tr><td className="p-4 text-gray-500" colSpan={7}>ยังไม่มีข้อมูลการขาย</td></tr>
             )}
           </tbody>
         </table>
