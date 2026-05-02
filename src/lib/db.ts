@@ -17,6 +17,7 @@ export interface DbResult<T> {
 // ── Schema types (column names ตรงกับ Supabase) ───────────────────────────────
 
 export interface ProfileInsert {
+  line_user_id?: string
   line_uid?: string
   full_name: string
   phone: string
@@ -599,6 +600,15 @@ export async function loginWithIdCardPhone(
   }
 }
 
+export async function saveProfileLineUserId(profileId: string, lineUserId: string): Promise<void> {
+  if (!supabase || !profileId || !lineUserId) return
+  const { error } = await supabase
+    .from('profiles')
+    .update({ line_user_id: lineUserId, line_uid: lineUserId })
+    .eq('id', profileId)
+  if (error) throw error
+}
+
 /** สมัครสมาชิก: check dup → upsert profile → insert farmer */
 export async function registerFarmerMember(
   payload: RegisterPayload
@@ -890,6 +900,33 @@ export interface MemberAdminFields {
   status?: string
 }
 
+function isServiceProviderRole(role?: string) {
+  return role === 'harvester' || role === 'tractor' || role === 'truck'
+}
+
+async function ensureFarmerFromProfile(profileId: string, status = 'pending_leader') {
+  if (!supabase) return
+  const { data: existing } = await supabase.from('farmers').select('id').eq('profile_id', profileId).maybeSingle()
+  if (existing) return
+  const { error } = await supabase.from('farmers').insert({ profile_id: profileId, status, member_status: status, role: 'member' })
+  if (error) throw error
+}
+
+async function ensureServiceProviderFromProfile(profileId: string, role: string) {
+  if (!supabase) return
+  const { data: existing } = await supabase.from('service_providers').select('id').eq('profile_id', profileId).eq('provider_type', role).maybeSingle()
+  if (existing) return
+  const { data: profile } = await supabase.from('profiles').select('full_name, grade, sub_role').eq('id', profileId).maybeSingle()
+  const { error } = await supabase.from('service_providers').insert({
+    profile_id: profileId,
+    provider_type: role,
+    provider_name: profile?.full_name ?? null,
+    sub_role: profile?.sub_role ?? null,
+    grade: profile?.grade ?? 'C',
+  })
+  if (error) throw error
+}
+
 export async function updateMemberAdminFields(
   id: string,
   payload: MemberAdminFields
@@ -909,6 +946,22 @@ export async function updateMemberAdminFields(
     if (error) {
       logSupabaseError('updateMemberAdminFields:profiles', error)
       throw new Error(error.message)
+    }
+  }
+
+  if (role === 'farmer') {
+    try {
+      await ensureFarmerFromProfile(id, status ?? 'pending_leader')
+    } catch (error) {
+      logSupabaseError('updateMemberAdminFields:ensureFarmer', error as { message: string; code?: string; details?: string })
+      throw error
+    }
+  } else if (isServiceProviderRole(role)) {
+    try {
+      await ensureServiceProviderFromProfile(id, role)
+    } catch (error) {
+      logSupabaseError('updateMemberAdminFields:ensureServiceProvider', error as { message: string; code?: string; details?: string })
+      throw error
     }
   }
 
@@ -968,6 +1021,9 @@ export async function upsertMember(row: ImportRow): Promise<'inserted' | 'update
       grade:     row.grade || 'C',
     }).eq('id', exist.id)
 
+    if (row.role === 'farmer') await ensureFarmerFromProfile(exist.id, row.status || 'pending_leader')
+    if (isServiceProviderRole(row.role)) await ensureServiceProviderFromProfile(exist.id, row.role)
+
     // update farmers (upsert ถ้าไม่มี row)
     const { data: f } = await supabase.from('farmers').select('id').eq('profile_id', exist.id).maybeSingle()
     if (f) {
@@ -1008,7 +1064,9 @@ export async function upsertMember(row: ImportRow): Promise<'inserted' | 'update
     }).select('id').single()
     if (pe) throw new Error(pe.message)
 
-    await supabase.from('farmers').insert({
+    if (row.role === 'farmer') await ensureFarmerFromProfile(p.id, row.status || 'pending_leader')
+    if (isServiceProviderRole(row.role)) await ensureServiceProviderFromProfile(p.id, row.role)
+    await supabase.from('farmers').upsert({
       profile_id:       p.id,
       province:         row.province,
       district:         row.district,
@@ -1017,9 +1075,10 @@ export async function upsertMember(row: ImportRow): Promise<'inserted' | 'update
       bank_account_no:  row.bank_account_no,
       bank_account_name:row.bank_account_name,
       status:           row.status || 'pending_line_verify',
+      member_status:    row.status || 'pending_line_verify',
       total_area:       0,
       tier:             'bronze',
-    })
+    }, { onConflict: 'profile_id' })
     return 'inserted'
   }
 }
