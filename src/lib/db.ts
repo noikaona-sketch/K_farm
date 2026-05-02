@@ -851,3 +851,43 @@ export async function updateRoleGrade(profileId: string, role: string, grade: st
     throw new Error(error.message)
   }
 }
+
+export interface MemberAdminFields {
+  role?: string
+  grade?: string
+  status?: string
+}
+
+export async function updateMemberAdminFields(
+  id: string,
+  payload: MemberAdminFields
+): Promise<void> {
+  const { role, grade, status } = payload
+
+  if (!supabase) {
+    console.info('[mock] updateMemberAdminFields', id, payload)
+    return
+  }
+
+  if (role !== undefined || grade !== undefined) {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ role, grade })
+      .eq('id', id)
+    if (error) {
+      logSupabaseError('updateMemberAdminFields:profiles', error)
+      throw new Error(error.message)
+    }
+  }
+
+  if (status !== undefined) {
+    const { error } = await supabase
+      .from('farmers')
+      .update({ status, member_status: status })
+      .eq('profile_id', id)
+    if (error) {
+      logSupabaseError('updateMemberAdminFields:farmers', error)
+      throw new Error(error.message)
+    }
+  }
+}
