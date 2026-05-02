@@ -24,6 +24,7 @@ import MemberTier         from './app/farmer/MemberTier'
 import RegisterPage       from './app/farmer/RegisterPage'
 import RegistrationStatus from './app/farmer/RegistrationStatus'
 import SeedVarieties      from './app/farmer/SeedVarieties'
+import FarmerSeedVarieties from './app/farmer/FarmerSeedVarieties'
 
 // Leader
 import LeaderDashboard  from './app/leader/LeaderDashboard'
@@ -133,6 +134,7 @@ export default function App() {
             <Route path="status"   element={<RegistrationStatus />} />
             <Route path="register" element={<RegisterPage />} />
             <Route path="seeds"    element={<SeedVarieties />} />
+            <Route path="seed-varieties" element={<FarmerSeedVarieties />} />
             <Route path="prices"   element={<PriceAnnouncement />} />
             <Route path="tier"     element={<MemberTier />} />
             {/* farmer+ only */}
