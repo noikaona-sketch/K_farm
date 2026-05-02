@@ -781,89 +781,40 @@ const MOCK_ADMIN_MEMBERS: AdminMemberRow[] = [
   },
 ]
 
-export async function fetchAdminMembers(): Promise<AdminMemberRow[]> {
+export async function fetchAdminMembers() {
   if (!supabase) {
     console.info('[mock] fetchAdminMembers')
     return MOCK_ADMIN_MEMBERS
   }
-  // ── profiles (ข้อมูลครบ ไม่ inner join — ดึงทุก profile ก่อน) ──
-  const { data: profileData, error: profileError } = await supabase
+
+  const { data: profiles, error: e1 } = await supabase
     .from('profiles')
-    .select(`
-      id,
-      full_name,
-      id_card,
-      phone,
-      role,
-      grade,
-      tier,
-      line_user_id,
-      line_verify_status,
-      created_at
-    `)
+    .select('*')
     .order('created_at', { ascending: false })
 
-  if (profileError) {
-    logSupabaseError('fetchAdminMembers:profiles', profileError)
-    throw profileError
+  const { data: farmers, error: e2 } = await supabase
+    .from('farmers')
+    .select('*')
+
+  if (e1 || e2) {
+    console.error('โหลดสมาชิกไม่สำเร็จ', e1 || e2)
+    throw new Error('โหลดสมาชิกไม่สำเร็จ')
   }
 
-  const profiles = profileData ?? []
-  if (profiles.length === 0) return []
-
-  // ── farmers (left join via profile_id) ──
-  const profileIds = profiles.map((p: Record<string, unknown>) => p.id as string)
-  const { data: farmerData } = await supabase
-    .from('farmers')
-    .select(`
-      id,
-      profile_id,
-      status,
-      province,
-      district,
-      village,
-      bank_name,
-      bank_account_no,
-      bank_account_name,
-      citizen_id
-    `)
-    .in('profile_id', profileIds)
-
-  // index by profile_id for O(1) lookup
-  const farmersByProfile: Record<string, Record<string, unknown>> = {}
-  ;(farmerData ?? []).forEach((f: Record<string, unknown>) => {
-    farmersByProfile[f.profile_id as string] = f
-  })
-
-  // merge
-  const merged: AdminMemberRow[] = profiles.map((p: Record<string, unknown>) => {
-    const f = farmersByProfile[p.id as string] ?? null
+  // merge เอง (true left join — profiles ไม่หายแม้ไม่มี farmer row)
+  const merged = (profiles ?? []).map((p: Record<string, unknown>) => {
+    const f = (farmers ?? []).find((x: Record<string, unknown>) => x.profile_id === p.id) ?? null
     return {
-      id:                 String(p.id),
-      full_name:          String(p.full_name ?? ''),
-      id_card:            p.id_card ? String(p.id_card) : null,
-      phone:              String(p.phone ?? ''),
-      role:               String(p.role ?? 'member'),
-      grade:              p.grade ? String(p.grade) : null,
-      tier:               p.tier ? String(p.tier) : null,
-      line_user_id:       p.line_user_id ? String(p.line_user_id) : null,
-      line_verify_status: p.line_verify_status ? String(p.line_verify_status) : null,
-      created_at:         String(p.created_at ?? ''),
-      farmers: f ? [{
-        id:               String(f.id ?? ''),
-        status:           f.status ? String(f.status) : null,
-        province:         f.province ? String(f.province) : null,
-        district:         f.district ? String(f.district) : null,
-        village:          f.village ? String(f.village) : null,
-        bank_name:        f.bank_name ? String(f.bank_name) : null,
-        bank_account_no:  f.bank_account_no ? String(f.bank_account_no) : null,
-        bank_account_name:f.bank_account_name ? String(f.bank_account_name) : null,
-        citizen_id:       f.citizen_id ? String(f.citizen_id) : null,
-      }] : [],  // profile ที่ยังไม่มี farmer row ก็ยังโชว์ได้
+      ...p,
+      farmer:  f,
+      farmers: f ? [f] : [],            // AdminMemberRow compat
+      status:  (f as Record<string,unknown>)?.status ?? 'pending_leader',
+      grade:   p.grade ?? p.tier ?? 'C',
     }
   })
 
-  return merged
+  console.log('[fetchAdminMembers] profiles:', profiles?.length, '| farmers:', farmers?.length, '| merged:', merged.length)
+  return merged as unknown as AdminMemberRow[]
 }
 
 export async function approveMember(profileId: string): Promise<void> {
