@@ -75,6 +75,13 @@ function RequireAuth({
   return <>{children}</>
 }
 
+/** Redirect logged-in users to member app (never force admin from /login flow). */
+function RedirectIfAuthedToMember({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth()
+  if (user) return <Navigate to="/farmer" replace />
+  return <>{children}</>
+}
+
 /** Redirect to role home when already logged in */
 function RedirectIfAuthed({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
@@ -122,9 +129,9 @@ export default function App() {
 
           {/* ── Public ── */}
           <Route path="/"            element={<Navigate to="/login" replace />} />
-          <Route path="/login"       element={<RedirectIfAuthed><LoginLanding /></RedirectIfAuthed>} />
-          <Route path="/register"    element={<RedirectIfAuthed><RegisterFlow /></RedirectIfAuthed>} />
-          <Route path="/signin"      element={<RedirectIfAuthed><SignIn /></RedirectIfAuthed>} />
+          <Route path="/login"       element={<RedirectIfAuthedToMember><LoginLanding /></RedirectIfAuthedToMember>} />
+          <Route path="/register"    element={<RedirectIfAuthedToMember><RegisterFlow /></RedirectIfAuthedToMember>} />
+          <Route path="/signin"      element={<RedirectIfAuthedToMember><SignIn /></RedirectIfAuthedToMember>} />
           <Route path="/admin-login" element={<RedirectIfAuthed><AdminLogin /></RedirectIfAuthed>} />
 
           {/* ── Farmer / Member — LINE Mini App ── */}
