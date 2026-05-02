@@ -1023,3 +1023,153 @@ export async function upsertMember(row: ImportRow): Promise<'inserted' | 'update
     return 'inserted'
   }
 }
+
+export interface SeedSupplier {
+  id: string
+  supplier_name: string
+  seed_brand: string | null
+  contact_name: string | null
+  phone: string | null
+  address: string | null
+  contract_terms: string | null
+  active_status: boolean
+  show_to_farmer: boolean
+}
+
+export interface SeedSupplierPayload {
+  supplier_name: string
+  seed_brand?: string | null
+  contact_name?: string | null
+  phone?: string | null
+  address?: string | null
+  contract_terms?: string | null
+  active_status?: boolean
+  show_to_farmer?: boolean
+}
+
+export interface SeedVariety {
+  id: string
+  supplier_id: string
+  supplier_name?: string | null
+  variety_name: string
+  brand: string | null
+  bag_weight_kg: number | null
+  price_per_bag: number | null
+  unit: string | null
+  maturity_days: number | null
+  recommended_area: string | null
+  soil_requirement: string | null
+  water_requirement: string | null
+  disease_resistance: string | null
+  planting_spacing: string | null
+  fertilizer_recommendation: string | null
+  restrictions: string | null
+  planting_steps: string | null
+  expected_yield: string | null
+  active_status: boolean
+  show_to_farmer: boolean
+}
+
+export interface SeedVarietyPayload {
+  supplier_id: string
+  variety_name: string
+  brand?: string | null
+  bag_weight_kg?: number | null
+  price_per_bag?: number | null
+  unit?: string | null
+  maturity_days?: number | null
+  recommended_area?: string | null
+  soil_requirement?: string | null
+  water_requirement?: string | null
+  disease_resistance?: string | null
+  planting_spacing?: string | null
+  fertilizer_recommendation?: string | null
+  restrictions?: string | null
+  planting_steps?: string | null
+  expected_yield?: string | null
+  active_status?: boolean
+  show_to_farmer?: boolean
+}
+
+export async function fetchSeedSuppliers(): Promise<DbResult<SeedSupplier[]>> {
+  if (!supabase) return { data: [], error: null, source: 'mock' }
+  const { data, error } = await supabase.from('seed_suppliers').select('*').order('supplier_name')
+  if (error) {
+    logSupabaseError('fetchSeedSuppliers', error)
+    return { data: [], error: error.message, source: 'supabase' }
+  }
+  return { data: (data ?? []) as SeedSupplier[], error: null, source: 'supabase' }
+}
+
+export async function createSeedSupplier(payload: SeedSupplierPayload): Promise<DbResult<{ id: string }>> {
+  if (!supabase) return { data: { id: `mock-${Date.now()}` }, error: null, source: 'mock' }
+  const { data, error } = await supabase.from('seed_suppliers').insert(payload).select('id').single()
+  if (error) logSupabaseError('createSeedSupplier', error)
+  return { data, error: error?.message ?? null, source: 'supabase' }
+}
+
+export async function updateSeedSupplier(id: string, payload: SeedSupplierPayload): Promise<DbResult<{ id: string }>> {
+  if (!supabase) return { data: { id }, error: null, source: 'mock' }
+  const { data, error } = await supabase.from('seed_suppliers').update(payload).eq('id', id).select('id').single()
+  if (error) logSupabaseError('updateSeedSupplier', error)
+  return { data, error: error?.message ?? null, source: 'supabase' }
+}
+
+export async function fetchSeedVarieties(filters?: { supplierId?: string; search?: string }): Promise<DbResult<SeedVariety[]>> {
+  if (!supabase) return { data: [], error: null, source: 'mock' }
+  let query = supabase.from('seed_varieties').select('*, seed_suppliers:supplier_id (supplier_name)').order('created_at', { ascending: false })
+  if (filters?.supplierId) query = query.eq('supplier_id', filters.supplierId)
+  if (filters?.search) {
+    query = query.or(`variety_name.ilike.%${filters.search}%,brand.ilike.%${filters.search}%`)
+  }
+  const { data, error } = await query
+  if (error) {
+    logSupabaseError('fetchSeedVarieties', error)
+    return { data: [], error: error.message, source: 'supabase' }
+  }
+  const mapped = (data ?? []).map((row: Record<string, unknown>) => ({
+    id: String(row.id ?? ''),
+    supplier_id: String(row.supplier_id ?? ''),
+    supplier_name: (row.seed_suppliers as { supplier_name?: string } | null)?.supplier_name ?? null,
+    variety_name: String(row.variety_name ?? ''),
+    brand: (row.brand as string | null) ?? null,
+    bag_weight_kg: (row.bag_weight_kg as number | null) ?? null,
+    price_per_bag: (row.price_per_bag as number | null) ?? null,
+    unit: (row.unit as string | null) ?? null,
+    maturity_days: (row.maturity_days as number | null) ?? null,
+    recommended_area: (row.recommended_area as string | null) ?? null,
+    soil_requirement: (row.soil_requirement as string | null) ?? null,
+    water_requirement: (row.water_requirement as string | null) ?? null,
+    disease_resistance: (row.disease_resistance as string | null) ?? null,
+    planting_spacing: (row.planting_spacing as string | null) ?? null,
+    fertilizer_recommendation: (row.fertilizer_recommendation as string | null) ?? null,
+    restrictions: (row.restrictions as string | null) ?? null,
+    planting_steps: (row.planting_steps as string | null) ?? null,
+    expected_yield: (row.expected_yield as string | null) ?? null,
+    active_status: Boolean(row.active_status),
+    show_to_farmer: Boolean(row.show_to_farmer),
+  }))
+  return { data: mapped as SeedVariety[], error: null, source: 'supabase' }
+}
+
+export async function fetchSeedVarietiesBySupplier(supplierId: string): Promise<DbResult<SeedVariety[]>> {
+  return fetchSeedVarieties({ supplierId })
+}
+
+export async function createSeedVariety(payload: SeedVarietyPayload): Promise<DbResult<{ id: string }>> {
+  if (!supabase) return { data: { id: `mock-${Date.now()}` }, error: null, source: 'mock' }
+  const { data: supplierExists } = await supabase.from('seed_suppliers').select('id').eq('id', payload.supplier_id).maybeSingle()
+  if (!supplierExists) return { data: null, error: 'ไม่พบ Supplier ที่เลือก', source: 'supabase' }
+  const { data, error } = await supabase.from('seed_varieties').insert(payload).select('id').single()
+  if (error) logSupabaseError('createSeedVariety', error)
+  return { data, error: error?.message ?? null, source: 'supabase' }
+}
+
+export async function updateSeedVariety(id: string, payload: SeedVarietyPayload): Promise<DbResult<{ id: string }>> {
+  if (!supabase) return { data: { id }, error: null, source: 'mock' }
+  const { data: supplierExists } = await supabase.from('seed_suppliers').select('id').eq('id', payload.supplier_id).maybeSingle()
+  if (!supplierExists) return { data: null, error: 'ไม่พบ Supplier ที่เลือก', source: 'supabase' }
+  const { data, error } = await supabase.from('seed_varieties').update(payload).eq('id', id).select('id').single()
+  if (error) logSupabaseError('updateSeedVariety', error)
+  return { data, error: error?.message ?? null, source: 'supabase' }
+}
