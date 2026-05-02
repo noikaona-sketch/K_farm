@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState } from 'react'
 import type { AppRole, Feature } from '../lib/roles'
 import { canAccess as _canAccess, atLeast, hasRole as _hasRole } from '../lib/roles'
 import type { Department, Permission } from '../lib/permissions'
-import { hasPermission as _hasPerm, getAllowedMenus, DEPT_PERMISSIONS } from '../lib/permissions'
+import { hasPermission as _hasPerm, getMenuForUser, ADMIN_MENUS, DEPT_PERMISSIONS } from '../lib/permissions'
 import type { AdminMenuItem } from '../lib/permissions'
 
 export type { AppRole }
@@ -114,7 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       canAccess:    (f) => _canAccess(role, f),
       atLeast:      (r) => atLeast(role, r),
       hasPerm:      (p) => _hasPerm(perms, p),
-      allowedMenus: getAllowedMenus(perms),
+      allowedMenus: getMenuForUser({ role: user?.role, permissions: perms }, ADMIN_MENUS),
     }}>
       {children}
     </Ctx.Provider>
