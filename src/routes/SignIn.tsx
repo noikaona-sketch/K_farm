@@ -37,7 +37,7 @@ export default function SignIn() {
       login(res.data)   // persist ใน localStorage ผ่าน AuthContext
 
       // route ตาม role
-      if (res.data.role === 'admin') navigate('/admin', { replace: true })
+      if (res.data.role === 'admin') navigate('/farmer', { replace: true })
       else if (res.data.role === 'leader') navigate('/leader', { replace: true })
       else if (res.data.role === 'inspector') navigate('/inspector', { replace: true })
       else navigate('/farmer', { replace: true })
