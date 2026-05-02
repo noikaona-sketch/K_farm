@@ -1,20 +1,19 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
+import { requireSupabase } from '../../lib/supabase'
 
-type SeedSupplier = { id: string; company_name: string; brand_name: string }
+type SeedSupplier = { id: string; supplier_name: string; seed_brand: string }
 type SeedVarietyOption = {
   id: string
   supplier_id: string
-  name: string
+  variety_name: string
   bag_weight_kg: number
   price_per_bag: number
 }
 
-type SeedStockLot = {
+type SeedStockLotRow = {
   id: string
   supplier_id: string
-  supplier_name: string
   variety_id: string
-  variety_name: string
   lot_no: string
   quantity_in: number
   quantity_balance: number
@@ -25,7 +24,13 @@ type SeedStockLot = {
   total_cost: number
   received_date: string
   expiry_date: string
+  status: string
   created_at: string
+}
+
+type SeedStockLotView = SeedStockLotRow & {
+  supplier_name: string
+  variety_name: string
 }
 
 type FormState = {
@@ -40,51 +45,52 @@ type FormState = {
   expiry_date: string
 }
 
-const STORAGE_KEY = 'kfarm_seed_stock_lots_v1'
-
-const SUPPLIERS: SeedSupplier[] = [
-  { id: 'sup-1', company_name: 'Pacific Seeds Thailand', brand_name: 'PAC' },
-  { id: 'sup-2', company_name: 'Syngenta Thailand', brand_name: 'NK' },
-  { id: 'sup-3', company_name: 'CP Seeds', brand_name: 'CP' },
-]
-
-const VARIETIES: SeedVarietyOption[] = [
-  { id: 'var-1', supplier_id: 'sup-1', name: 'PAC339', bag_weight_kg: 20, price_per_bag: 2100 },
-  { id: 'var-2', supplier_id: 'sup-1', name: 'PAC999', bag_weight_kg: 20, price_per_bag: 2250 },
-  { id: 'var-3', supplier_id: 'sup-2', name: 'NK7328', bag_weight_kg: 15, price_per_bag: 1950 },
-  { id: 'var-4', supplier_id: 'sup-3', name: 'CP888', bag_weight_kg: 25, price_per_bag: 2350 },
-]
-
-async function fetchSeedSuppliers(): Promise<SeedSupplier[]> { return SUPPLIERS }
-async function fetchSeedVarietiesBySupplier(supplierId: string): Promise<SeedVarietyOption[]> {
-  return VARIETIES.filter((variety) => variety.supplier_id === supplierId)
-}
-
-function loadLots(): SeedStockLot[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return []
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
-}
+const emptyForm: FormState = { supplier_id: '', variety_id: '', lot_no: '', quantity_in: '', bag_weight_kg: '', cost_price_per_bag: '', sell_price_per_bag: '', received_date: '', expiry_date: '' }
 
 export default function AdminSeedStock() {
-  const [lots, setLots] = useState<SeedStockLot[]>(() => loadLots())
+  const [lots, setLots] = useState<SeedStockLotView[]>([])
   const [suppliers, setSuppliers] = useState<SeedSupplier[]>([])
-  const [varieties, setVarieties] = useState<SeedVarietyOption[]>([])
-  const [form, setForm] = useState<FormState>({ supplier_id: '', variety_id: '', lot_no: '', quantity_in: '', bag_weight_kg: '', cost_price_per_bag: '', sell_price_per_bag: '', received_date: '', expiry_date: '' })
+  const [allVarieties, setAllVarieties] = useState<SeedVarietyOption[]>([])
+  const [form, setForm] = useState<FormState>(emptyForm)
+  const [err, setErr] = useState<string | null>(null)
+  const [msg, setMsg] = useState<string | null>(null)
 
-  useEffect(() => { fetchSeedSuppliers().then(setSuppliers) }, [])
-  useEffect(() => {
-    if (!form.supplier_id) {
-      setVarieties([])
-      return
+  const varieties = useMemo(() => allVarieties.filter(v => v.supplier_id === form.supplier_id), [allVarieties, form.supplier_id])
+
+  const loadData = async () => {
+    try {
+      setErr(null)
+      const db = requireSupabase()
+      const [supRes, varRes, lotRes] = await Promise.all([
+        db.from('seed_suppliers').select('id,supplier_name,seed_brand').eq('active_status', true).order('supplier_name'),
+        db.from('seed_varieties').select('id,supplier_id,variety_name,bag_weight_kg,price_per_bag'),
+        db.from('seed_stock_lots').select('*').order('created_at', { ascending: false }),
+      ])
+
+      if (supRes.error) throw new Error(`โหลด Supplier ไม่สำเร็จ: ${supRes.error.message}`)
+      if (varRes.error) throw new Error(`โหลด Variety ไม่สำเร็จ: ${varRes.error.message}`)
+      if (lotRes.error) throw new Error(`โหลดข้อมูลสต็อกไม่สำเร็จ: ${lotRes.error.message}`)
+
+      const supData = (supRes.data ?? []) as SeedSupplier[]
+      const varData = (varRes.data ?? []) as SeedVarietyOption[]
+      const lotData = (lotRes.data ?? []) as SeedStockLotRow[]
+
+      const supplierMap = new Map(supData.map(s => [s.id, `${s.supplier_name} (${s.seed_brand || '-'})`]))
+      const varietyMap = new Map(varData.map(v => [v.id, v.variety_name]))
+
+      setSuppliers(supData)
+      setAllVarieties(varData)
+      setLots(lotData.map(lot => ({
+        ...lot,
+        supplier_name: supplierMap.get(lot.supplier_id) ?? lot.supplier_id,
+        variety_name: varietyMap.get(lot.variety_id) ?? lot.variety_id,
+      })))
+    } catch (error) {
+      setErr(error instanceof Error ? `เกิดข้อผิดพลาด: ${error.message}` : 'เกิดข้อผิดพลาดในการโหลดข้อมูล')
     }
-    fetchSeedVarietiesBySupplier(form.supplier_id).then(setVarieties)
-  }, [form.supplier_id])
+  }
+
+  useEffect(() => { void loadData() }, [])
 
   const onSupplierChange = (supplierId: string) => {
     setForm((prev) => ({ ...prev, supplier_id: supplierId, variety_id: '', bag_weight_kg: '', sell_price_per_bag: '' }))
@@ -95,67 +101,70 @@ export default function AdminSeedStock() {
     setForm((prev) => ({
       ...prev,
       variety_id: varietyId,
-      bag_weight_kg: variety ? String(variety.bag_weight_kg) : prev.bag_weight_kg,
-      sell_price_per_bag: variety ? String(variety.price_per_bag) : prev.sell_price_per_bag,
+      bag_weight_kg: variety ? String(variety.bag_weight_kg) : '',
+      sell_price_per_bag: variety ? String(variety.price_per_bag) : '',
     }))
   }
 
-  const saveLots = (nextLots: SeedStockLot[]) => {
-    setLots(nextLots)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(nextLots))
-  }
-
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.supplier_id) throw new Error('กรุณาเลือก Supplier')
-    if (!form.variety_id) throw new Error('กรุณาเลือกพันธุ์')
-    if (!form.lot_no.trim()) throw new Error('กรุณากรอก Lot')
+    try {
+      setErr(null)
+      setMsg(null)
+      if (!form.supplier_id) throw new Error('กรุณาเลือก Supplier')
+      if (!form.variety_id) throw new Error('กรุณาเลือกพันธุ์')
+      if (!form.lot_no.trim()) throw new Error('กรุณากรอก Lot No.')
 
-    const quantity_in = Number(form.quantity_in)
-    if (quantity_in <= 0) throw new Error('จำนวนต้องมากกว่า 0')
+      const quantity_in = Number(form.quantity_in)
+      const bag_weight_kg = Number(form.bag_weight_kg)
+      const cost_price_per_bag = Number(form.cost_price_per_bag)
+      const sell_price_per_bag = Number(form.sell_price_per_bag)
 
-    const supplier = suppliers.find((item) => item.id === form.supplier_id)
-    const variety = varieties.find((item) => item.id === form.variety_id)
-    if (!supplier || !variety) return
+      if (quantity_in <= 0) throw new Error('จำนวนรับเข้าต้องมากกว่า 0')
+      if (bag_weight_kg <= 0) throw new Error('น้ำหนักต่อถุงต้องมากกว่า 0')
+      if (cost_price_per_bag < 0 || sell_price_per_bag < 0) throw new Error('ราคาต้องไม่ติดลบ')
 
-    const bag_weight_kg = Number(form.bag_weight_kg)
-    const cost_price_per_bag = Number(form.cost_price_per_bag)
-    const sell_price_per_bag = Number(form.sell_price_per_bag)
+      const db = requireSupabase()
+      const payload = {
+        supplier_id: form.supplier_id,
+        variety_id: form.variety_id,
+        lot_no: form.lot_no.trim(),
+        quantity_in,
+        quantity_balance: quantity_in,
+        bag_weight_kg,
+        total_weight_kg: quantity_in * bag_weight_kg,
+        cost_price_per_bag,
+        sell_price_per_bag,
+        total_cost: quantity_in * cost_price_per_bag,
+        received_date: form.received_date,
+        expiry_date: form.expiry_date,
+        status: 'available',
+      }
 
-    const lot: SeedStockLot = {
-      id: `lot-${Date.now()}`,
-      supplier_id: form.supplier_id,
-      variety_id: form.variety_id,
-      supplier_name: `${supplier.company_name} (${supplier.brand_name})`,
-      variety_name: variety.name,
-      lot_no: form.lot_no,
-      quantity_in,
-      bag_weight_kg,
-      cost_price_per_bag,
-      sell_price_per_bag,
-      quantity_balance: quantity_in,
-      total_weight_kg: quantity_in * bag_weight_kg,
-      total_cost: quantity_in * cost_price_per_bag,
-      received_date: form.received_date,
-      expiry_date: form.expiry_date,
-      created_at: new Date().toISOString(),
+      const { error } = await db.from('seed_stock_lots').insert(payload)
+      if (error) throw new Error(`บันทึกข้อมูลไม่สำเร็จ: ${error.message}`)
+
+      setMsg('บันทึกรับเข้า Stock สำเร็จ')
+      setForm(emptyForm)
+      await loadData()
+    } catch (error) {
+      setErr(error instanceof Error ? error.message : 'บันทึกข้อมูลไม่สำเร็จ')
     }
-
-    saveLots([lot, ...lots])
-    setForm({ supplier_id: '', variety_id: '', lot_no: '', quantity_in: '', bag_weight_kg: '', cost_price_per_bag: '', sell_price_per_bag: '', received_date: '', expiry_date: '' })
   }
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <div><h1 className="text-2xl font-bold text-gray-900">รับเข้า Stock เมล็ดพันธุ์</h1></div>
+      {msg && <div className="bg-emerald-50 border border-emerald-300 p-2 rounded text-emerald-700 text-sm">{msg}</div>}
+      {err && <div className="bg-red-50 border border-red-300 p-2 rounded text-red-700 text-sm">{err}</div>}
       <form onSubmit={onSubmit} className="bg-white rounded-2xl border border-gray-200 p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
         <select required value={form.supplier_id} onChange={(e) => onSupplierChange(e.target.value)} className="border rounded-lg p-2">
           <option value="">เลือก Supplier</option>
-          {suppliers.map((s) => <option key={s.id} value={s.id}>{s.company_name} ({s.brand_name})</option>)}
+          {suppliers.map((s) => <option key={s.id} value={s.id}>{s.supplier_name} ({s.seed_brand})</option>)}
         </select>
         <select required value={form.variety_id} onChange={(e) => onSelectVariety(e.target.value)} className="border rounded-lg p-2" disabled={!form.supplier_id}>
           <option value="">เลือก Variety</option>
-          {varieties.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+          {varieties.map((v) => <option key={v.id} value={v.id}>{v.variety_name}</option>)}
         </select>
         <input required placeholder="Lot No." value={form.lot_no} onChange={(e) => setForm((p) => ({ ...p, lot_no: e.target.value }))} className="border rounded-lg p-2" />
         <input required type="number" min="1" placeholder="จำนวนถุง" value={form.quantity_in} onChange={(e) => setForm((p) => ({ ...p, quantity_in: e.target.value }))} className="border rounded-lg p-2" />
