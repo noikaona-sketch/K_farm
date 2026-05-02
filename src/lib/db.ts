@@ -972,3 +972,103 @@ export async function updateMemberAdminFields(
     }
   }
 }
+
+// ── Member Import (findByIdCard / upsertMember) ────────────────────────────────
+
+export interface ImportRow {
+  id_card?: string
+  full_name?: string
+  phone?: string
+  province?: string
+  district?: string
+  village?: string
+  bank_name?: string
+  bank_account_no?: string
+  bank_account_name?: string
+  role?: string
+  grade?: string
+  status?: string
+}
+
+export async function findByIdCard(id_card: string): Promise<{ id: string } | null> {
+  if (!supabase) return null
+  const { data } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id_card', id_card)
+    .maybeSingle()
+  return data as { id: string } | null
+}
+
+export async function upsertMember(row: ImportRow): Promise<'inserted' | 'updated'> {
+  if (!supabase) {
+    console.info('[mock] upsertMember', row.id_card)
+    return 'inserted'
+  }
+
+  const exist = await findByIdCard(row.id_card!)
+
+  if (exist) {
+    // update profiles
+    await supabase.from('profiles').update({
+      full_name: row.full_name,
+      phone:     row.phone,
+      role:      row.role  || 'member',
+      grade:     row.grade || 'C',
+    }).eq('id', exist.id)
+
+    // update farmers (upsert ถ้าไม่มี row)
+    const { data: f } = await supabase.from('farmers').select('id').eq('profile_id', exist.id).maybeSingle()
+    if (f) {
+      await supabase.from('farmers').update({
+        province:         row.province,
+        district:         row.district,
+        village:          row.village,
+        bank_name:        row.bank_name,
+        bank_account_no:  row.bank_account_no,
+        bank_account_name:row.bank_account_name,
+        status:           row.status || 'pending_line_verify',
+      }).eq('profile_id', exist.id)
+    } else {
+      await supabase.from('farmers').insert({
+        profile_id:       exist.id,
+        province:         row.province,
+        district:         row.district,
+        village:          row.village,
+        bank_name:        row.bank_name,
+        bank_account_no:  row.bank_account_no,
+        bank_account_name:row.bank_account_name,
+        status:           row.status || 'pending_line_verify',
+        total_area:       0,
+        tier:             'bronze',
+      })
+    }
+    return 'updated'
+
+  } else {
+    // insert profiles
+    const { data: p, error: pe } = await supabase.from('profiles').insert({
+      id_card:            row.id_card,
+      full_name:          row.full_name,
+      phone:              row.phone,
+      role:               row.role  || 'member',
+      grade:              row.grade || 'C',
+      line_verify_status: 'line_pending',
+    }).select('id').single()
+    if (pe) throw new Error(pe.message)
+
+    await supabase.from('farmers').insert({
+      profile_id:       p.id,
+      province:         row.province,
+      district:         row.district,
+      village:          row.village,
+      bank_name:        row.bank_name,
+      bank_account_no:  row.bank_account_no,
+      bank_account_name:row.bank_account_name,
+      status:           row.status || 'pending_line_verify',
+      total_area:       0,
+      tier:             'bronze',
+    })
+    return 'inserted'
+  }
+}
