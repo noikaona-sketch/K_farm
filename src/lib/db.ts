@@ -739,20 +739,24 @@ export async function registerFarmerMember(
 export interface AdminMemberRow {
   id: string
   full_name: string
-  id_card: string
+  id_card: string | null      // อาจ null ถ้าไม่ได้กรอก
   phone: string
   role: string
   grade: string | null
+  tier: string | null         // standard / gold / etc.
+  line_user_id: string | null
   line_verify_status: string | null
   created_at: string
   farmers: {
-    status: string
+    id?: string
+    status: string | null
     province: string | null
     district: string | null
     village: string | null
     bank_name: string | null
     bank_account_no: string | null
     bank_account_name: string | null
+    citizen_id?: string | null  // farmers table อาจเก็บ citizen_id แยก
   }[]
 }
 
@@ -760,19 +764,19 @@ const MOCK_ADMIN_MEMBERS: AdminMemberRow[] = [
   {
     id: 'mock-p1', full_name: 'สมชาย ใจดี', id_card: '1234567890123',
     phone: '0812345678', role: 'member', grade: null,
-    line_verify_status: 'verified', created_at: '2025-04-01T10:00:00Z',
+    tier: 'standard', line_user_id: null, line_verify_status: 'verified', created_at: '2025-04-01T10:00:00Z',
     farmers: [{ status: 'pending_leader', province: 'บุรีรัมย์', district: 'เมือง', village: 'บ้านดง', bank_name: 'ธ.ก.ส.', bank_account_no: '02012345678', bank_account_name: 'สมชาย ใจดี' }],
   },
   {
     id: 'mock-p2', full_name: 'นภา ฟ้าใส', id_card: '9876543210987',
     phone: '0898765432', role: 'farmer', grade: 'A',
-    line_verify_status: 'verified', created_at: '2025-03-15T08:30:00Z',
+    tier: 'gold', line_user_id: null, line_verify_status: 'verified', created_at: '2025-03-15T08:30:00Z',
     farmers: [{ status: 'approved', province: 'บุรีรัมย์', district: 'กระสัง', village: 'บ้านทุ่ง', bank_name: 'ธนาคารกรุงไทย', bank_account_no: '01098765432', bank_account_name: 'นภา ฟ้าใส' }],
   },
   {
     id: 'mock-p3', full_name: 'ประสิทธิ์ ดีงาม', id_card: '1122334455667',
     phone: '0844441111', role: 'member', grade: null,
-    line_verify_status: null, created_at: '2025-04-28T14:00:00Z',
+    tier: 'standard', line_user_id: null, line_verify_status: null, created_at: '2025-04-28T14:00:00Z',
     farmers: [{ status: 'pending_leader', province: 'สุรินทร์', district: 'เมือง', village: 'บ้านโนน', bank_name: 'ธนาคารออมสิน', bank_account_no: '03011223344', bank_account_name: 'ประสิทธิ์ ดีงาม' }],
   },
 ]
@@ -782,7 +786,8 @@ export async function fetchAdminMembers(): Promise<AdminMemberRow[]> {
     console.info('[mock] fetchAdminMembers')
     return MOCK_ADMIN_MEMBERS
   }
-  const { data, error } = await supabase
+  // ── profiles (ข้อมูลครบ ไม่ inner join — ดึงทุก profile ก่อน) ──
+  const { data: profileData, error: profileError } = await supabase
     .from('profiles')
     .select(`
       id,
@@ -791,52 +796,128 @@ export async function fetchAdminMembers(): Promise<AdminMemberRow[]> {
       phone,
       role,
       grade,
+      tier,
+      line_user_id,
       line_verify_status,
-      created_at,
-      farmers (
-        status,
-        province,
-        district,
-        village,
-        bank_name,
-        bank_account_no,
-        bank_account_name
-      )
+      created_at
     `)
     .order('created_at', { ascending: false })
-  if (error) {
-    logSupabaseError('fetchAdminMembers', error)
-    throw error
+
+  if (profileError) {
+    logSupabaseError('fetchAdminMembers:profiles', profileError)
+    throw profileError
   }
-  return (data ?? []) as AdminMemberRow[]
+
+  const profiles = profileData ?? []
+  if (profiles.length === 0) return []
+
+  // ── farmers (left join via profile_id) ──
+  const profileIds = profiles.map((p: Record<string, unknown>) => p.id as string)
+  const { data: farmerData } = await supabase
+    .from('farmers')
+    .select(`
+      id,
+      profile_id,
+      status,
+      province,
+      district,
+      village,
+      bank_name,
+      bank_account_no,
+      bank_account_name,
+      citizen_id
+    `)
+    .in('profile_id', profileIds)
+
+  // index by profile_id for O(1) lookup
+  const farmersByProfile: Record<string, Record<string, unknown>> = {}
+  ;(farmerData ?? []).forEach((f: Record<string, unknown>) => {
+    farmersByProfile[f.profile_id as string] = f
+  })
+
+  // merge
+  const merged: AdminMemberRow[] = profiles.map((p: Record<string, unknown>) => {
+    const f = farmersByProfile[p.id as string] ?? null
+    return {
+      id:                 String(p.id),
+      full_name:          String(p.full_name ?? ''),
+      id_card:            p.id_card ? String(p.id_card) : null,
+      phone:              String(p.phone ?? ''),
+      role:               String(p.role ?? 'member'),
+      grade:              p.grade ? String(p.grade) : null,
+      tier:               p.tier ? String(p.tier) : null,
+      line_user_id:       p.line_user_id ? String(p.line_user_id) : null,
+      line_verify_status: p.line_verify_status ? String(p.line_verify_status) : null,
+      created_at:         String(p.created_at ?? ''),
+      farmers: f ? [{
+        id:               String(f.id ?? ''),
+        status:           f.status ? String(f.status) : null,
+        province:         f.province ? String(f.province) : null,
+        district:         f.district ? String(f.district) : null,
+        village:          f.village ? String(f.village) : null,
+        bank_name:        f.bank_name ? String(f.bank_name) : null,
+        bank_account_no:  f.bank_account_no ? String(f.bank_account_no) : null,
+        bank_account_name:f.bank_account_name ? String(f.bank_account_name) : null,
+        citizen_id:       f.citizen_id ? String(f.citizen_id) : null,
+      }] : [],  // profile ที่ยังไม่มี farmer row ก็ยังโชว์ได้
+    }
+  })
+
+  return merged
 }
 
 export async function approveMember(profileId: string): Promise<void> {
   if (!supabase) { console.info('[mock] approveMember', profileId); return }
+
+  // 1. อัปเดต profiles.role → farmer
   const { error: pe } = await supabase
     .from('profiles')
     .update({ role: 'farmer' })
     .eq('id', profileId)
-  if (pe) logSupabaseError('approveMember:profiles', pe)
+  if (pe) { logSupabaseError('approveMember:profiles', pe); throw new Error(pe.message) }
 
-  const { error: fe } = await supabase
+  // 2. ถ้ามี farmers row → update status; ถ้าไม่มี → insert ใหม่
+  const { data: existing } = await supabase
     .from('farmers')
-    .update({ status: 'approved' })
+    .select('id')
     .eq('profile_id', profileId)
-  if (fe) logSupabaseError('approveMember:farmers', fe)
+    .maybeSingle()
 
-  if (pe || fe) throw new Error(pe?.message ?? fe?.message ?? 'อนุมัติไม่สำเร็จ')
+  if (existing) {
+    const { error: fe } = await supabase
+      .from('farmers')
+      .update({ status: 'approved' })
+      .eq('profile_id', profileId)
+    if (fe) { logSupabaseError('approveMember:farmers.update', fe); throw new Error(fe.message) }
+  } else {
+    // สร้าง farmers row ใหม่ถ้ายังไม่มี
+    const { error: fe } = await supabase
+      .from('farmers')
+      .insert({ profile_id: profileId, status: 'approved', tier: 'bronze', total_area: 0 })
+    if (fe) { logSupabaseError('approveMember:farmers.insert', fe); throw new Error(fe.message) }
+  }
 }
 
 export async function rejectMember(profileId: string): Promise<void> {
   if (!supabase) { console.info('[mock] rejectMember', profileId); return }
-  const { error } = await supabase
+
+  const { data: existing } = await supabase
     .from('farmers')
-    .update({ status: 'rejected' })
+    .select('id')
     .eq('profile_id', profileId)
-  if (error) {
-    logSupabaseError('rejectMember', error)
-    throw new Error(error.message)
+    .maybeSingle()
+
+  if (existing) {
+    const { error } = await supabase
+      .from('farmers')
+      .update({ status: 'rejected' })
+      .eq('profile_id', profileId)
+    if (error) { logSupabaseError('rejectMember', error); throw new Error(error.message) }
+  } else {
+    const { error } = await supabase
+      .from('farmers')
+      .insert({ profile_id: profileId, status: 'rejected', tier: 'bronze', total_area: 0 })
+    if (error) { logSupabaseError('rejectMember:insert', error); throw new Error(error.message) }
   }
 }
 

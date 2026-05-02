@@ -70,14 +70,18 @@ export default function MembersPage() {
   // ── summary (spec §6) ─────────────────────────────────────────────────────────
   const total    = data.length
   const approved = data.filter(x => x.farmers?.[0]?.status === 'approved').length
-  const pending  = data.filter(x => x.farmers?.[0]?.status?.includes('pending')).length
+  // profiles ที่ไม่มี farmers row ถือว่า pending ด้วย
+  const pending  = data.filter(x => {
+    const s = x.farmers?.[0]?.status
+    return !s || s.includes('pending')
+  }).length
   const rejected = data.filter(x => x.farmers?.[0]?.status === 'rejected').length
 
   // ── filter + search (spec §3) ─────────────────────────────────────────────────
   const filtered = data.filter(u => {
     const matchSearch =
       u.full_name?.includes(search) ||
-      u.id_card?.includes(search)   ||
+      (u.id_card ?? '').includes(search) ||
       u.phone?.includes(search)
     const matchRole = filterRole === 'all' || u.role === filterRole
     return matchSearch && matchRole
