@@ -1232,3 +1232,112 @@ export async function updateSeedVariety(id: string, payload: SeedVarietyPayload)
   if (error) logSupabaseError('updateSeedVariety', error)
   return { data, error: error?.message ?? null, source: 'supabase' }
 }
+
+export type ReservationStatus = 'requested' | 'approved' | 'converted' | 'cancelled'
+export type HarvestStatus = 'scheduled' | 'in_progress' | 'completed'
+
+export interface SeedSaleInsert {
+  profile_id: string
+  lot_id: string
+  reservation_id?: string
+  quantity: number
+  unit_price?: number
+  sale_date?: string
+  note?: string
+}
+
+export interface CropQualityRecordInsert {
+  farmer_id?: string
+  profile_id?: string
+  farm_id?: string
+  agri_cycle_id?: string
+  crop_type?: string
+  sale_date?: string
+  weight_kg?: number
+  moisture: number
+  impurity: number
+  broken_kernel: number
+  grade: 'A' | 'B' | 'C'
+  harvester_provider_id?: string
+  transport_provider_id?: string
+  note?: string
+}
+
+export interface ServiceProviderRatingInsert {
+  service_provider_id: string
+  farmer_id?: string
+  profile_id?: string
+  farm_id?: string
+  agri_cycle_id?: string
+  service_booking_id?: string
+  harvest_appointment_id?: string
+  provider_type?: string
+  score: number
+  comment?: string
+  rated_by?: string
+}
+
+export function getServiceProviderGrade(score: number): 'A' | 'B' | 'C' {
+  if (score >= 4.5) return 'A'
+  if (score >= 3) return 'B'
+  return 'C'
+}
+
+export async function createSeedSaleWithStockFlow(payload: SeedSaleInsert): Promise<DbResult<{ id: string }>> {
+  if (!supabase) return { data: { id: `mock-${Date.now()}` }, error: null, source: 'mock' }
+
+  const { data: lot, error: lotError } = await supabase
+    .from('seed_stock_lots')
+    .select('id, quantity_balance')
+    .eq('id', payload.lot_id)
+    .single()
+
+  if (lotError || !lot) {
+    logSupabaseError('createSeedSaleWithStockFlow:loadLot', lotError ?? { message: 'Lot not found' })
+    return { data: null, error: lotError?.message ?? 'ไม่พบล็อตคงเหลือ', source: 'supabase' }
+  }
+
+  const remaining = Number(lot.quantity_balance ?? 0) - payload.quantity
+  if (remaining < 0) {
+    return { data: null, error: 'จำนวนสต๊อกไม่เพียงพอ', source: 'supabase' }
+  }
+
+  const { data, error } = await supabase.from('seed_sales').insert(payload).select('id').single()
+  if (error) {
+    logSupabaseError('createSeedSaleWithStockFlow:createSale', error)
+    return { data: null, error: error.message, source: 'supabase' }
+  }
+
+  const { error: stockError } = await supabase
+    .from('seed_stock_lots')
+    .update({ quantity_balance: remaining })
+    .eq('id', payload.lot_id)
+  if (stockError) {
+    logSupabaseError('createSeedSaleWithStockFlow:updateStock', stockError)
+    return { data: null, error: stockError.message, source: 'supabase' }
+  }
+
+  return { data, error: null, source: 'supabase' }
+}
+
+export async function createCropQualityRecord(payload: CropQualityRecordInsert): Promise<DbResult<{ id: string }>> {
+  if (!supabase) return { data: { id: `mock-${Date.now()}` }, error: null, source: 'mock' }
+  const { data, error } = await supabase.from('crop_quality_records').insert(payload).select('id').single()
+  if (error) logSupabaseError('createCropQualityRecord', error)
+  return { data, error: error?.message ?? null, source: 'supabase' }
+}
+
+export async function createServiceProviderRating(payload: ServiceProviderRatingInsert): Promise<DbResult<{ id: string; grade: 'A' | 'B' | 'C' }>> {
+  if (!supabase) {
+    return { data: { id: `mock-${Date.now()}`, grade: getServiceProviderGrade(payload.score) }, error: null, source: 'mock' }
+  }
+
+  const grade = getServiceProviderGrade(payload.score)
+  const { data, error } = await supabase
+    .from('service_provider_ratings')
+    .insert({ ...payload, grade })
+    .select('id, grade')
+    .single()
+  if (error) logSupabaseError('createServiceProviderRating', error)
+  return { data: (data as { id: string; grade: 'A' | 'B' | 'C' }) ?? null, error: error?.message ?? null, source: 'supabase' }
+}
