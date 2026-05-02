@@ -733,3 +733,121 @@ export async function registerFarmerMember(
   }
   return { data: authUser, error: null, source: 'supabase' }
 }
+
+// ── Admin Members (fetchAdminMembers / approveMember / rejectMember / updateRoleGrade) ──
+
+export interface AdminMemberRow {
+  id: string
+  full_name: string
+  id_card: string
+  phone: string
+  role: string
+  grade: string | null
+  line_verify_status: string | null
+  created_at: string
+  farmers: {
+    status: string
+    province: string | null
+    district: string | null
+    village: string | null
+    bank_name: string | null
+    bank_account_no: string | null
+    bank_account_name: string | null
+  }[]
+}
+
+const MOCK_ADMIN_MEMBERS: AdminMemberRow[] = [
+  {
+    id: 'mock-p1', full_name: 'สมชาย ใจดี', id_card: '1234567890123',
+    phone: '0812345678', role: 'member', grade: null,
+    line_verify_status: 'verified', created_at: '2025-04-01T10:00:00Z',
+    farmers: [{ status: 'pending_leader', province: 'บุรีรัมย์', district: 'เมือง', village: 'บ้านดง', bank_name: 'ธ.ก.ส.', bank_account_no: '02012345678', bank_account_name: 'สมชาย ใจดี' }],
+  },
+  {
+    id: 'mock-p2', full_name: 'นภา ฟ้าใส', id_card: '9876543210987',
+    phone: '0898765432', role: 'farmer', grade: 'A',
+    line_verify_status: 'verified', created_at: '2025-03-15T08:30:00Z',
+    farmers: [{ status: 'approved', province: 'บุรีรัมย์', district: 'กระสัง', village: 'บ้านทุ่ง', bank_name: 'ธนาคารกรุงไทย', bank_account_no: '01098765432', bank_account_name: 'นภา ฟ้าใส' }],
+  },
+  {
+    id: 'mock-p3', full_name: 'ประสิทธิ์ ดีงาม', id_card: '1122334455667',
+    phone: '0844441111', role: 'member', grade: null,
+    line_verify_status: null, created_at: '2025-04-28T14:00:00Z',
+    farmers: [{ status: 'pending_leader', province: 'สุรินทร์', district: 'เมือง', village: 'บ้านโนน', bank_name: 'ธนาคารออมสิน', bank_account_no: '03011223344', bank_account_name: 'ประสิทธิ์ ดีงาม' }],
+  },
+]
+
+export async function fetchAdminMembers(): Promise<AdminMemberRow[]> {
+  if (!supabase) {
+    console.info('[mock] fetchAdminMembers')
+    return MOCK_ADMIN_MEMBERS
+  }
+  const { data, error } = await supabase
+    .from('profiles')
+    .select(`
+      id,
+      full_name,
+      id_card,
+      phone,
+      role,
+      grade,
+      line_verify_status,
+      created_at,
+      farmers (
+        status,
+        province,
+        district,
+        village,
+        bank_name,
+        bank_account_no,
+        bank_account_name
+      )
+    `)
+    .order('created_at', { ascending: false })
+  if (error) {
+    logSupabaseError('fetchAdminMembers', error)
+    throw error
+  }
+  return (data ?? []) as AdminMemberRow[]
+}
+
+export async function approveMember(profileId: string): Promise<void> {
+  if (!supabase) { console.info('[mock] approveMember', profileId); return }
+  const { error: pe } = await supabase
+    .from('profiles')
+    .update({ role: 'farmer' })
+    .eq('id', profileId)
+  if (pe) logSupabaseError('approveMember:profiles', pe)
+
+  const { error: fe } = await supabase
+    .from('farmers')
+    .update({ status: 'approved' })
+    .eq('profile_id', profileId)
+  if (fe) logSupabaseError('approveMember:farmers', fe)
+
+  if (pe || fe) throw new Error(pe?.message ?? fe?.message ?? 'อนุมัติไม่สำเร็จ')
+}
+
+export async function rejectMember(profileId: string): Promise<void> {
+  if (!supabase) { console.info('[mock] rejectMember', profileId); return }
+  const { error } = await supabase
+    .from('farmers')
+    .update({ status: 'rejected' })
+    .eq('profile_id', profileId)
+  if (error) {
+    logSupabaseError('rejectMember', error)
+    throw new Error(error.message)
+  }
+}
+
+export async function updateRoleGrade(profileId: string, role: string, grade: string): Promise<void> {
+  if (!supabase) { console.info('[mock] updateRoleGrade', profileId, role, grade); return }
+  const { error } = await supabase
+    .from('profiles')
+    .update({ role, grade: grade || null })
+    .eq('id', profileId)
+  if (error) {
+    logSupabaseError('updateRoleGrade', error)
+    throw new Error(error.message)
+  }
+}
