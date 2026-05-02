@@ -110,6 +110,10 @@ export default function AdminSeedSales() {
   const overStock = !!selectedLot && quantity > selectedLot.quantity_balance
 
   const applyReservation = (reservationId: string) => {
+    if (!reservationId) {
+      setForm((p) => ({ ...p, reservation_id: '' }))
+      return
+    }
     const r = reservations.find(x => x.id === reservationId)
     if (!r) return
     const lot = availableLots.find(x => x.id === r.lot_id)
@@ -136,7 +140,22 @@ export default function AdminSeedSales() {
       const { error: stockErr } = await db.from('seed_stock_lots').update({ quantity_balance: selectedLot.quantity_balance - quantity, status: selectedLot.quantity_balance - quantity <= 0 ? 'sold_out' : 'available' }).eq('id', selectedLot.id)
       if (stockErr) throw new Error(`อัปเดตสต็อกไม่สำเร็จ: ${stockErr.message}`)
       if (form.reservation_id) {
-        await db.from('seed_sale_reservations').update({ status: 'sold' }).eq('id', form.reservation_id)
+        const selectedReservation = reservations.find((r) => r.id === form.reservation_id)
+        if (selectedReservation) {
+          if (quantity < selectedReservation.reserved_qty) {
+            const { error: reservationErr } = await db
+              .from('seed_sale_reservations')
+              .update({ quantity: selectedReservation.reserved_qty - quantity, status: 'reserved' })
+              .eq('id', form.reservation_id)
+            if (reservationErr) throw new Error(`อัปเดตรายการจองไม่สำเร็จ: ${reservationErr.message}`)
+          } else {
+            const { error: reservationErr } = await db
+              .from('seed_sale_reservations')
+              .update({ status: 'sold' })
+              .eq('id', form.reservation_id)
+            if (reservationErr) throw new Error(`อัปเดตรายการจองไม่สำเร็จ: ${reservationErr.message}`)
+          }
+        }
       }
       setOk('บันทึกการขายสำเร็จ')
       setForm((p) => ({ ...p, farmer_id: '', supplier_id: '', variety_id: '', lot_id: '', quantity: '', bag_weight_kg: '', sell_price_per_bag: '', reservation_id: '' }))
@@ -165,5 +184,15 @@ export default function AdminSeedSales() {
       <div className="md:col-span-2 bg-gray-50 rounded-lg p-3 text-sm space-y-1"><div>ยอดขายรวม: <b>{totalAmount.toLocaleString()} บาท</b></div><div>คงเหลือหลังขาย: <b className={overStock ? 'text-red-600' : ''}>{selectedLot ? remaining.toLocaleString() : '-'} ถุง</b></div></div>
       <button disabled={overStock} type="submit" className="md:col-span-3 bg-green-600 disabled:bg-gray-400 text-white rounded-lg py-2 font-semibold">ขายเมล็ด</button>
     </form>
+
+    <div className="bg-white rounded-2xl border border-gray-200 overflow-x-auto">
+      <table className="min-w-full text-sm">
+        <thead className="bg-gray-50"><tr>{['วันที่', 'เกษตรกร', 'Supplier', 'Variety', 'Lot', 'จำนวน', 'ราคา/ถุง', 'ยอดรวม'].map((h) => <th key={h} className="text-left p-3 font-semibold text-gray-700">{h}</th>)}</tr></thead>
+        <tbody>
+          {sales.map((row) => <tr key={row.id} className="border-t"><td className="p-3">{row.sale_date}</td><td className="p-3">{row.farmer_name}</td><td className="p-3">{row.supplier_name}</td><td className="p-3">{row.variety_name}</td><td className="p-3">{row.lot_no}</td><td className="p-3">{row.quantity}</td><td className="p-3">{row.sell_price_per_bag.toLocaleString()}</td><td className="p-3">{row.total_amount.toLocaleString()}</td></tr>)}
+          {sales.length === 0 && <tr><td colSpan={8} className="p-4 text-gray-500">ยังไม่มีข้อมูลการขาย</td></tr>}
+        </tbody>
+      </table>
+    </div>
   </div>
 }
