@@ -13,6 +13,7 @@ export type Department =
 
 export type Permission =
   | 'member.view' | 'member.approve' | 'member.import' | 'member.set_role'
+  | 'team.view' | 'team.edit'
   | 'seed.view' | 'seed.edit' | 'seed.stock' | 'seed.sales' | 'seed.debt'
   | 'price.view' | 'price.edit'
   | 'inspection.view' | 'inspection.edit'
@@ -21,13 +22,13 @@ export type Permission =
   | 'system.roles' | 'system.all'
 
 export const DEPT_PERMISSIONS: Record<Department, Permission[]> = {
-  agri: ['member.view', 'member.approve', 'seed.view', 'inspection.view', 'inspection.edit', 'report.view'],
-  sales: ['member.view', 'price.view', 'price.edit', 'seed.view', 'seed.sales', 'seed.debt', 'report.view', 'report.export'],
+  agri: ['member.view', 'member.approve', 'team.view', 'seed.view', 'inspection.view', 'inspection.edit', 'report.view'],
+  sales: ['member.view', 'team.view', 'price.view', 'price.edit', 'seed.view', 'seed.sales', 'seed.debt', 'report.view', 'report.export'],
   stock: ['seed.view', 'seed.edit', 'seed.stock', 'seed.sales', 'seed.debt', 'service.view', 'report.view'],
-  accounting: ['member.view', 'price.view', 'seed.view', 'seed.debt', 'report.view', 'report.export'],
-  inspection: ['member.view', 'inspection.view', 'inspection.edit', 'report.view'],
-  service: ['service.view', 'service.edit', 'member.view', 'report.view'],
-  it: ['member.view', 'member.approve', 'member.import', 'member.set_role', 'seed.view', 'seed.edit', 'seed.stock', 'seed.sales', 'seed.debt', 'price.view', 'price.edit', 'inspection.view', 'inspection.edit', 'service.view', 'service.edit', 'report.view', 'report.export', 'system.roles', 'system.all'],
+  accounting: ['member.view', 'team.view', 'price.view', 'seed.view', 'seed.debt', 'report.view', 'report.export'],
+  inspection: ['member.view', 'team.view', 'inspection.view', 'inspection.edit', 'report.view'],
+  service: ['service.view', 'service.edit', 'member.view', 'team.view', 'report.view'],
+  it: ['member.view', 'member.approve', 'member.import', 'member.set_role', 'team.view', 'team.edit', 'seed.view', 'seed.edit', 'seed.stock', 'seed.sales', 'seed.debt', 'price.view', 'price.edit', 'inspection.view', 'inspection.edit', 'service.view', 'service.edit', 'report.view', 'report.export', 'system.roles', 'system.all'],
 }
 
 export interface AdminMenuItem {
@@ -39,18 +40,37 @@ export interface AdminMenuItem {
 
 export const ADMIN_MENUS: AdminMenuItem[] = [
   { to: '/admin', label: 'Dashboard', icon: '📊', permission: 'member.view' },
-  { to: '/admin/members', label: 'Profile / สมาชิก / อนุมัติ', icon: '👥', permission: 'member.view' },
+
+  { to: '/admin/members', label: 'สมาชิก / ติดตามสถานะ', icon: '👥', permission: 'member.view' },
+  { to: '/admin/member-dashboard', label: 'สรุปจำนวนสมาชิก', icon: '📌', permission: 'member.view' },
   { to: '/admin/member-import', label: 'Import สมาชิกเก่า Excel', icon: '📥', permission: 'member.import' },
   { to: '/admin/roles', label: 'กำหนดสิทธิ์ / Role / Grade', icon: '🔐', permission: 'system.roles' },
+
+  { to: '/admin/service-providers', label: 'รถ / ผู้ให้บริการ', icon: '🚜', permission: 'service.view' },
+  { to: '/admin/vehicle-dashboard', label: 'สรุปรถ / สถานะผู้ให้บริการ', icon: '🚛', permission: 'service.view' },
+
+  { to: '/admin/team', label: 'ทีมงาน / Admin หลายส่วนงาน', icon: '🏢', permission: 'team.view' },
+  { to: '/admin/team-permissions', label: 'ทีมงาน + Permission Matrix', icon: '🧩', permission: 'team.view' },
+
   { to: '/admin/seed-suppliers', label: 'Supplier เมล็ดพันธุ์', icon: '🏪', permission: 'seed.edit' },
   { to: '/admin/seed-varieties', label: 'พันธุ์เมล็ดพันธุ์', icon: '🌾', permission: 'seed.edit' },
   { to: '/admin/seed-stock', label: 'รับเข้า Stock เมล็ดพันธุ์', icon: '📦', permission: 'seed.stock' },
   { to: '/admin/seed-sales', label: 'จองเมล็ดพันธุ์', icon: '📝', permission: 'seed.sales' },
   { to: '/admin/seed-invoice', label: 'ขายเมล็ดพันธุ์ / Invoice', icon: '🛒', permission: 'seed.sales' },
   { to: '/admin/seed-debt', label: 'ลูกหนี้เมล็ดพันธุ์ / ค้างส่ง', icon: '💳', permission: 'seed.debt' },
-  { to: '/admin/service-providers', label: 'ผู้ให้บริการ รถเกี่ยว/รถไถ/ขนส่ง', icon: '🚜', permission: 'service.view' },
+
+  { to: '/admin/crop-cycle', label: 'วงจรเกษตรสมาชิก', icon: '🔄', permission: 'inspection.view' },
+  { to: '/admin/planting-cycle', label: 'วงจรการปลูก', icon: '🌱', permission: 'inspection.view' },
+  { to: '/admin/activity', label: 'กิจกรรมไม่เผา', icon: '🚫', permission: 'inspection.view' },
+  { to: '/admin/calendar', label: 'ปฏิทินงานภาคสนาม', icon: '🗓️', permission: 'inspection.view' },
   { to: '/admin/field-inspections', label: 'ตรวจแปลง', icon: '🔍', permission: 'inspection.view' },
-  { to: '/admin/reports', label: 'รายงาน', icon: '📈', permission: 'report.view' },
+  { to: '/admin/quality', label: 'คุณภาพผลผลิต', icon: '📈', permission: 'inspection.view' },
+
+  { to: '/admin/vehicle-schedule', label: 'นัดเกี่ยว / นัดรถ', icon: '🚚', permission: 'service.view' },
+  { to: '/admin/service-review', label: 'ประเมินผู้ให้บริการ', icon: '⭐', permission: 'service.view' },
+
+  { to: '/admin/reports', label: 'รายงาน', icon: '📊', permission: 'report.view' },
+  { to: '/admin/settings', label: 'ตั้งค่า', icon: '⚙️', permission: 'system.roles' },
   { to: '/admin/prices', label: 'จัดการราคา', icon: '💰', permission: 'price.edit' },
   { to: '/admin/map', label: 'แผนที่แปลง', icon: '🗺️', permission: 'inspection.view' },
 ]
