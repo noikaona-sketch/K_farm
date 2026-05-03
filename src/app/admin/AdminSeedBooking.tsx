@@ -13,7 +13,6 @@ const MOCK_FARMERS: PosFarmer[] = [
   { id: 'mock-f1', profileId: 'mock-p1', name: 'สมชาย ใจดี', phone: '0812345678', idCard: '1234567890123', district: 'สำโรง' },
 ]
 
-const [assignBooking, setAssignBooking] = useState(null)
 
 const MOCK_LOTS: PosLot[] = [
   { id: 'mock-v1', supplierId: 'mock-s1', supplierName: 'Supplier A', varietyId: 'mock-v1', varietyName: 'ข้าวโพด A', lotNo: '', balance: 0, price: 850 },
@@ -40,6 +39,7 @@ export default function AdminSeedBooking() {
   const [cart, setCart] = useState<PosCartItem[]>([])
   const [bookings, setBookings] = useState<BookingRow[]>([])
   const [bookingItems, setBookingItems] = useState<BookingItemRow[]>([])
+  const [assignBooking, setAssignBooking] = useState(null)
   const [pickupLocations, setPickupLocations] = useState<PickupLocation[]>([])
   const [pickupSlots, setPickupSlots] = useState<PickupSlot[]>([])
   const [selectedLocationId, setSelectedLocationId] = useState('')
