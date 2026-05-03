@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { AlertCircle, CalendarCheck, Check, MapPin, RefreshCw, ShoppingCart, Wifi, WifiOff } from 'lucide-react'
+import { AlertCircle, CalendarCheck, Check, MapPin, RefreshCw, Search, ShoppingCart, Wifi, WifiOff } from 'lucide-react'
 import { isSupabaseReady, supabase } from '../../lib/supabase'
 import SeedPOSProductGrid from './SeedPOSProductGrid'
 import SeedPOSCart from './SeedPOSCart'
@@ -67,6 +67,7 @@ export default function AdminSeedBooking() {
   const [selectedFarmerId, setSelectedFarmerId] = useState('')
   const [supplierFilter, setSupplierFilter] = useState('all')
   const [productSearch, setProductSearch] = useState('')
+  const [historySearch, setHistorySearch] = useState('')
   const [bookingDate, setBookingDate] = useState(todayDate())
   const [receiveDate, setReceiveDate] = useState(addDaysDate(7))
   const [depositAmount, setDepositAmount] = useState('0')
@@ -116,7 +117,7 @@ export default function AdminSeedBooking() {
 
       const memberRows = await loadMembers()
       const [varietyRes, supplierRes, lotRes, bookingRes, locationRes, slotRes] = await Promise.all([
-        supabase.from('seed_varieties').select('id,variety_name,supplier_id,sell_price_per_bag,sell_price,price').order('variety_name'),
+        supabase.from('seed_varieties').select('id,variety_name,supplier_id,sell_price_per_bag,price').order('variety_name'),
         supabase.from('seed_suppliers').select('id,supplier_name'),
         supabase.from('seed_stock_lots').select('id,supplier_id,supplier_name,variety_id,variety_name,lot_no,quantity_balance,created_at,status').gt('quantity_balance', 0).neq('status', 'inactive').order('created_at', { ascending: true }),
         supabase.from('seed_bookings').select('*').order('booking_date', { ascending: false }).limit(50),
@@ -138,7 +139,7 @@ export default function AdminSeedBooking() {
       setLots((lotRes.data ?? []).map((r: any) => {
         const v: any = varietyMap.get(String(r.variety_id))
         const supplierId = String(r.supplier_id ?? v?.supplier_id ?? '')
-        const salePrice = Number(v?.sell_price_per_bag ?? v?.sell_price ?? v?.price ?? 0)
+        const salePrice = Number(v?.sell_price_per_bag ?? v?.price ?? 0)
         return { id: String(r.id), supplierId, supplierName: String(r.supplier_name ?? supplierMap.get(supplierId) ?? '-'), varietyId: String(r.variety_id ?? ''), varietyName: String(r.variety_name ?? v?.variety_name ?? '-'), lotNo: String(r.lot_no ?? '-'), balance: Number(r.quantity_balance ?? 0), price: salePrice, createdAt: String(r.created_at ?? '') }
       }))
       setBookings((bookingRes.data ?? []).map((r: any) => ({
@@ -180,6 +181,29 @@ export default function AdminSeedBooking() {
     const kw = productSearch.trim().toLowerCase()
     return lots.filter((l) => (supplierFilter === 'all' || (l.supplierId || '-') === supplierFilter) && (!kw || `${l.varietyName} ${l.lotNo} ${l.supplierName}`.toLowerCase().includes(kw)))
   }, [lots, supplierFilter, productSearch])
+
+  const filteredBookings = useMemo(() => {
+    const kw = historySearch.trim().toLowerCase()
+    if (!kw) return bookings
+    return bookings.filter((b) => `${b.booking_no} ${b.farmer_name} ${b.farmer_phone} ${b.status} ${b.note ?? ''}`.toLowerCase().includes(kw))
+  }, [bookings, historySearch])
+
+  const bookingSummary = useMemo(() => {
+    const totalAmount = filteredBookings.reduce((sum, b) => sum + Number(b.total_amount || 0), 0)
+    const deposit = filteredBookings.reduce((sum, b) => sum + Number(b.deposit_amount || 0), 0)
+    const pending = filteredBookings.filter((b) => b.status !== 'converted' && b.status !== 'cancelled').length
+    return { count: filteredBookings.length, totalAmount, deposit, debt: Math.max(totalAmount - deposit, 0), pending }
+  }, [filteredBookings])
+
+  const summaryByStatus = useMemo(() => {
+    const rows = new Map<string, { status: string; count: number; total: number }>()
+    filteredBookings.forEach((b) => {
+      const key = b.status || 'pending'
+      const prev = rows.get(key) ?? { status: key, count: 0, total: 0 }
+      rows.set(key, { ...prev, count: prev.count + 1, total: prev.total + Number(b.total_amount || 0) })
+    })
+    return Array.from(rows.values())
+  }, [filteredBookings])
 
   const clearBooking = () => {
     setCart([])
@@ -361,10 +385,29 @@ export default function AdminSeedBooking() {
         </div>
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+        <div className="bg-white border rounded-2xl p-4"><div className="text-xs text-gray-500">จำนวนใบจอง</div><div className="text-xl font-bold">{bookingSummary.count}</div></div>
+        <div className="bg-white border rounded-2xl p-4"><div className="text-xs text-gray-500">รอดำเนินการ</div><div className="text-xl font-bold text-amber-600">{bookingSummary.pending}</div></div>
+        <div className="bg-white border rounded-2xl p-4"><div className="text-xs text-gray-500">ยอดจองรวม</div><div className="text-xl font-bold">{fmtMoney(bookingSummary.totalAmount)}</div></div>
+        <div className="bg-white border rounded-2xl p-4"><div className="text-xs text-gray-500">เงินมัดจำ</div><div className="text-xl font-bold text-emerald-600">{fmtMoney(bookingSummary.deposit)}</div></div>
+        <div className="bg-white border rounded-2xl p-4"><div className="text-xs text-gray-500">ยอดค้าง</div><div className="text-xl font-bold text-red-600">{fmtMoney(bookingSummary.debt)}</div></div>
+      </div>
+
+      <div className="bg-white rounded-2xl border p-4 space-y-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="font-bold">สรุปประวัติจอง</div>
+          <div className="relative w-full md:w-96">
+            <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+            <input value={historySearch} onChange={(e) => setHistorySearch(e.target.value)} placeholder="ค้นหาชื่อสมาชิก / เบอร์ / เลขจอง / สถานะ" className="w-full border rounded-xl pl-9 pr-3 py-2" />
+          </div>
+        </div>
+        {summaryByStatus.length > 0 && <div className="flex flex-wrap gap-2 text-xs">{summaryByStatus.map((s) => <span key={s.status} className="px-3 py-1 rounded-full bg-gray-100 text-gray-700">{s.status}: {s.count} ใบ / {fmtMoney(s.total)}</span>)}</div>}
+      </div>
+
       <div className="bg-white rounded-2xl border overflow-x-auto">
         <table className="w-full text-sm">
-          <thead><tr className="bg-gray-50 text-xs text-gray-500"><th className="text-left p-3">เลขจอง</th><th className="text-left p-3">วันที่จอง</th><th className="text-left p-3">นัดรับ</th><th className="text-left p-3">สมาชิก</th><th className="text-right p-3">ยอดจอง</th><th className="text-center p-3">สถานะ</th><th className="text-left p-3">หมายเหตุ</th><th className="text-center p-3">จัดการ</th></tr></thead>
-          <tbody>{loading ? <tr><td colSpan={8} className="p-6 text-center text-gray-400">กำลังโหลด...</td></tr> : bookings.length === 0 ? <tr><td colSpan={8} className="p-6 text-center text-gray-400">ยังไม่มีรายการจอง</td></tr> : bookings.map((b) => <tr key={b.id} className="border-t"><td className="p-3 font-mono">{b.booking_no}</td><td className="p-3">{b.booking_date}</td><td className="p-3">{b.receive_date}</td><td className="p-3">{b.farmer_name}</td><td className="p-3 text-right">{fmtMoney(b.total_amount)}</td><td className="p-3 text-center">{b.status}</td><td className="p-3">{b.note || '-'}</td><td className="p-3 text-center"><button type="button" disabled={saving || b.status === 'converted'} onClick={() => void convertToPOS(b)} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold disabled:bg-gray-300"><ShoppingCart className="w-3 h-3" />แปลงเป็นขาย</button></td></tr>)}</tbody>
+          <thead><tr className="bg-gray-50 text-xs text-gray-500"><th className="text-left p-3">เลขจอง</th><th className="text-left p-3">วันที่จอง</th><th className="text-left p-3">นัดรับ</th><th className="text-left p-3">สมาชิก</th><th className="text-right p-3">ยอดจอง</th><th className="text-right p-3">มัดจำ</th><th className="text-right p-3">ค้าง</th><th className="text-center p-3">สถานะ</th><th className="text-left p-3">หมายเหตุ</th><th className="text-center p-3">จัดการ</th></tr></thead>
+          <tbody>{loading ? <tr><td colSpan={10} className="p-6 text-center text-gray-400">กำลังโหลด...</td></tr> : filteredBookings.length === 0 ? <tr><td colSpan={10} className="p-6 text-center text-gray-400">ยังไม่มีรายการจอง</td></tr> : filteredBookings.map((b) => <tr key={b.id} className="border-t"><td className="p-3 font-mono">{b.booking_no}</td><td className="p-3">{b.booking_date}</td><td className="p-3">{b.receive_date}</td><td className="p-3"><div>{b.farmer_name}</div><div className="text-xs text-gray-400">{b.farmer_phone}</div></td><td className="p-3 text-right">{fmtMoney(b.total_amount)}</td><td className="p-3 text-right text-emerald-600">{fmtMoney(b.deposit_amount)}</td><td className="p-3 text-right text-red-600">{fmtMoney(Math.max(Number(b.total_amount || 0) - Number(b.deposit_amount || 0), 0))}</td><td className="p-3 text-center">{b.status}</td><td className="p-3">{b.note || '-'}</td><td className="p-3 text-center"><button type="button" disabled={saving || b.status === 'converted'} onClick={() => void convertToPOS(b)} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold disabled:bg-gray-300"><ShoppingCart className="w-3 h-3" />แปลงเป็นขาย</button></td></tr>)}</tbody>
         </table>
       </div>
     </div>
