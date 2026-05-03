@@ -31,7 +31,7 @@ const STAFF_ACCOUNTS: StaffAccount[] = [
     name: 'เจ้าหน้าที่ภาคสนาม',
     role: 'field',
     department: 'agri',
-    permissions: ['field.view', 'field.seed_booking', 'field.farm_inspection', 'field.no_burn'],
+    permissions: ['field.view','field.member_register', 'field.seed_booking', 'field.farm_inspection', 'field.no_burn'],
   },
   {
     code: 'LD001',
