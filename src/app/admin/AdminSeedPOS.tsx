@@ -8,7 +8,7 @@ import { addDaysDate, todayDate, fmtMoney } from './seedPosTypes'
 import { addLotToCart, calcPayment, validateCartSale } from './seedPosLogic'
 
 const MOCK_FARMERS: PosFarmer[] = [
-  { id: 'mock-f1', profileId: 'mock-p1', name: 'สมชาย ใจดี', phone: '0812345678', district: 'สำโรง' },
+  { id: 'mock-f1', profileId: 'mock-p1', name: 'สมชาย ใจดี', phone: '0812345678', idCard: '1234567890123', district: 'สำโรง' },
 ]
 
 const MOCK_LOTS: PosLot[] = [
@@ -41,7 +41,7 @@ export default function AdminSeedPOS() {
     if (!supabase) return MOCK_FARMERS
     const [farmerRes, profileRes] = await Promise.all([
       supabase.from('farmers').select('*').order('created_at', { ascending: false }),
-      supabase.from('profiles').select('id,full_name,phone,role'),
+      supabase.from('profiles').select('id,full_name,phone,id_card,role'),
     ])
     if (farmerRes.error) throw new Error(`โหลด farmers ไม่สำเร็จ: ${farmerRes.error.message}`)
     if (profileRes.error) throw new Error(`โหลด profiles ไม่สำเร็จ: ${profileRes.error.message}`)
@@ -55,6 +55,7 @@ export default function AdminSeedPOS() {
           profileId: f.profile_id ? String(f.profile_id) : undefined,
           name: String(f.full_name ?? p?.full_name ?? f.name ?? '-'),
           phone: String(f.phone ?? p?.phone ?? ''),
+          idCard: String(f.id_card ?? p?.id_card ?? ''),
           district: String(f.district ?? ''),
           village: String(f.village ?? ''),
         }
@@ -198,6 +199,7 @@ export default function AdminSeedPOS() {
       }
       setOk(paymentType === 'cash' ? `ขายสำเร็จ เงินทอน ${fmtMoney(payment.change)} บาท` : `ขายเครดิตสำเร็จ ยอดค้าง ${fmtMoney(payment.debt)} บาท`)
       clearCart()
+      setSelectedFarmerId('')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'ขายไม่สำเร็จ')
     } finally {
@@ -224,40 +226,9 @@ export default function AdminSeedPOS() {
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
         <div className="xl:col-span-2">
-          <SeedPOSProductGrid
-            lots={filteredLots}
-            suppliers={suppliers}
-            supplierFilter={supplierFilter}
-            productSearch={productSearch}
-            onSupplierFilterChange={setSupplierFilter}
-            onProductSearchChange={setProductSearch}
-            onAddToCart={(lot) => setCart((prev) => addLotToCart(prev, lot))}
-          />
+          <SeedPOSProductGrid lots={filteredLots} suppliers={suppliers} supplierFilter={supplierFilter} productSearch={productSearch} onSupplierFilterChange={setSupplierFilter} onProductSearchChange={setProductSearch} onAddToCart={(lot) => setCart((prev) => addLotToCart(prev, lot))} />
         </div>
-
-        <SeedPOSCart
-          cart={cart}
-          farmers={farmers}
-          selectedFarmerId={selectedFarmerId}
-          paymentType={paymentType}
-          cashReceived={cashReceived}
-          creditPaid={creditPaid}
-          dueDate={dueDate}
-          saleDate={saleDate}
-          saving={saving}
-          total={payment.total}
-          change={payment.change}
-          debt={payment.debt}
-          onCartChange={setCart}
-          onFarmerChange={setSelectedFarmerId}
-          onPaymentTypeChange={setPaymentType}
-          onCashReceivedChange={setCashReceived}
-          onCreditPaidChange={setCreditPaid}
-          onDueDateChange={setDueDate}
-          onSaleDateChange={setSaleDate}
-          onClear={clearCart}
-          onSubmit={submitSale}
-        />
+        <SeedPOSCart cart={cart} farmers={farmers} selectedFarmerId={selectedFarmerId} paymentType={paymentType} cashReceived={cashReceived} creditPaid={creditPaid} dueDate={dueDate} saleDate={saleDate} saving={saving} total={payment.total} change={payment.change} debt={payment.debt} onCartChange={setCart} onFarmerChange={setSelectedFarmerId} onPaymentTypeChange={setPaymentType} onCashReceivedChange={setCashReceived} onCreditPaidChange={setCreditPaid} onDueDateChange={setDueDate} onSaleDateChange={setSaleDate} onClear={clearCart} onSubmit={submitSale} />
       </div>
 
       <div className="bg-white rounded-2xl border overflow-x-auto">
