@@ -39,7 +39,7 @@ export default function AdminSeedBooking() {
   const [cart, setCart] = useState<PosCartItem[]>([])
   const [bookings, setBookings] = useState<BookingRow[]>([])
   const [bookingItems, setBookingItems] = useState<BookingItemRow[]>([])
-  const [assignBooking, setAssignBooking] = useState(null)
+  const [assignBooking, setAssignBooking] = useState<BookingRow | null>(null)
   const [pickupLocations, setPickupLocations] = useState<PickupLocation[]>([])
   const [pickupSlots, setPickupSlots] = useState<PickupSlot[]>([])
   const [selectedLocationId, setSelectedLocationId] = useState('')
@@ -165,3 +165,4 @@ export default function AdminSeedBooking() {
 )}
 
 </div>
+}
