@@ -151,8 +151,7 @@ export default function AdminSeedBooking() {
       <ShoppingCart className="w-3 h-3" />
       แปลงเป็นขาย
     </button>
-  </div></td>
-</td></tr>)}</tbody></table></div>
+ </div></td></tr>)}</tbody></table></div>
 
 {assignBooking && (
   <AdminAssignLotPanel
@@ -164,3 +163,5 @@ export default function AdminSeedBooking() {
     }}
   />
 )}
+
+</div>
