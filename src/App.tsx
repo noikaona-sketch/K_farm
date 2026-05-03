@@ -10,6 +10,7 @@ import RequirePermission from './routes/RequirePermission'
 import MemberSeedBookingMobile from './app/farmer/MemberSeedBookingMobile'
 import MemberSeedBookingHistory from './app/farmer/MemberSeedBookingHistory'
 import FieldSeedBooking from './app/field/FieldSeedBooking'
+import FieldFarmInspection from './app/field/FieldFarmInspection'
 
 // Auth
 import LoginLanding  from './routes/LoginLanding'
@@ -114,62 +115,26 @@ export default function App() {
         <Route path="farms/add" element={<RequireAuth minRole="farmer"><AddFarm /></RequireAuth>} />
         <Route path="planting" element={<RequireAuth minRole="farmer"><PlantingRecord /></RequireAuth>} />
       </Route>
-        <Route path="/field" element={<RequireAuth minRole="field"><MobileLayout /></RequireAuth>}>
-  <Route
-    index
-    element={
-      <div className="p-5 space-y-4">
-        <h1 className="text-xl font-bold text-gray-900">งานภาคสนาม</h1>
-        <p className="text-sm text-gray-500">เลือกเมนูด้านล่างเพื่อเริ่มงาน</p>
 
-        <div className="grid gap-3">
-          <a href="/field/seed-booking" className="bg-white rounded-2xl p-5 shadow-sm border">
-            🌾 จองเมล็ดพันธุ์
-          </a>
-          <a href="/field/farm-inspection" className="bg-white rounded-2xl p-5 shadow-sm border">
-            🔍 ตรวจแปลง
-          </a>
-          <a href="/field/no-burn" className="bg-white rounded-2xl p-5 shadow-sm border">
-            🚫 ตรวจไม่เผา
-          </a>
-        </div>
-      </div>
-    }
-  />
-
-  <Route
-  path="seed-booking"
-  element={
-    <RequirePermission permission="field.seed_booking" fallback="/field">
-      <FieldSeedBooking />
-    </RequirePermission>
-  }
-/>
-
-  <Route
-    path="farm-inspection"
-    element={
-      <RequirePermission permission="field.farm_inspection" fallback="/field">
-        <div className="p-5">
-          <h1 className="text-xl font-bold">ตรวจแปลง</h1>
-          <p className="text-gray-500 text-sm mt-2">ฟอร์มตรวจแปลงภาคสนาม</p>
-        </div>
-      </RequirePermission>
-    }
-  />
-
-  <Route
-    path="no-burn"
-    element={
-      <RequirePermission permission="field.no_burn" fallback="/field">
-        <div className="p-5">
-          <h1 className="text-xl font-bold">ตรวจไม่เผา</h1>
-          <p className="text-gray-500 text-sm mt-2">ฟอร์มตรวจหลักฐานไม่เผา</p>
-        </div>
-      </RequirePermission>
-    }
-  />
-</Route>
+      <Route path="/field" element={<RequireAuth minRole="field"><MobileLayout /></RequireAuth>}>
+        <Route
+          index
+          element={
+            <div className="p-5 space-y-4">
+              <h1 className="text-xl font-bold text-gray-900">งานภาคสนาม</h1>
+              <p className="text-sm text-gray-500">เลือกเมนูด้านล่างเพื่อเริ่มงาน</p>
+              <div className="grid gap-3">
+                <a href="/field/seed-booking" className="bg-white rounded-2xl p-5 shadow-sm border">🌾 จองเมล็ดพันธุ์</a>
+                <a href="/field/farm-inspection" className="bg-white rounded-2xl p-5 shadow-sm border">🔍 ตรวจแปลง</a>
+                <a href="/field/no-burn" className="bg-white rounded-2xl p-5 shadow-sm border">🚫 ตรวจไม่เผา</a>
+              </div>
+            </div>
+          }
+        />
+        <Route path="seed-booking" element={<RequirePermission permission="field.seed_booking" fallback="/field"><FieldSeedBooking /></RequirePermission>} />
+        <Route path="farm-inspection" element={<RequirePermission permission="field.farm_inspection" fallback="/field"><FieldFarmInspection /></RequirePermission>} />
+        <Route path="no-burn" element={<RequirePermission permission="field.no_burn" fallback="/field"><div className="p-5"><h1 className="text-xl font-bold">ตรวจไม่เผา</h1><p className="text-gray-500 text-sm mt-2">ฟอร์มตรวจหลักฐานไม่เผา</p></div></RequirePermission>} />
+      </Route>
       
       <Route path="/leader" element={<RequireAuth minRole="leader"><MobileLayout /></RequireAuth>}>
         <Route index element={<LeaderDashboard />} />
