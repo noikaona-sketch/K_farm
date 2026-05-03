@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { AlertCircle, Check, FileText, RefreshCw, RotateCcw, Search, Wifi, WifiOff } from 'lucide-react'
+import { AlertCircle, Banknote, Check, FileText, RefreshCw, RotateCcw, Search, Wifi, WifiOff } from 'lucide-react'
 import { isSupabaseReady, supabase } from '../../lib/supabase'
 
 type Farmer = { id: string; name: string; phone: string }
 type Lot = { id: string; varietyId: string; varietyName: string; lotNo: string; balance: number; price: number; createdAt?: string }
-type SaleRow = { id: string; sale_date: string; farmer_name: string; variety_name: string; lot_id: string; lot_no: string; quantity: number; total_amount: number; paid_amount: number; payment_status: string; delivery_status: string; due_date: string; is_returned?: boolean }
+type SaleRow = { id: string; sale_date: string; farmer_name: string; variety_name: string; lot_id: string; lot_no: string; quantity: number; total_amount: number; paid_amount: number; refund_amount: number; payment_status: string; delivery_status: string; due_date: string; is_returned?: boolean; refund_status?: string; refund_date?: string }
 
 const MOCK_FARMERS: Farmer[] = [
   { id: 'mock-f1', name: 'สมชาย ใจดี', phone: '0812345678' },
@@ -51,7 +51,7 @@ export default function AdminSeedInvoice() {
       const varietyMap = new Map((varietyRes.data ?? []).map((r: any) => [String(r.id), String(r.variety_name ?? '-')]))
       setFarmers((farmerRes.data ?? []).map((r: any) => ({ id: String(r.id), name: String(r.full_name ?? '-'), phone: String(r.phone ?? '') })))
       setLots((lotRes.data ?? []).map((r: any) => ({ id: String(r.id), varietyId: String(r.variety_id), varietyName: varietyMap.get(String(r.variety_id)) ?? '-', lotNo: String(r.lot_no ?? '-'), balance: Number(r.quantity_balance ?? 0), price: Number(r.sell_price_per_bag ?? 0), createdAt: String(r.created_at ?? '') })))
-      setSales((saleRes.data ?? []).map((r: any) => ({ id: String(r.id), sale_date: String(r.sale_date ?? ''), farmer_name: String(r.farmer_name ?? r.farmer_id ?? '-'), variety_name: String(r.variety_name ?? r.variety_id ?? '-'), lot_id: String(r.lot_id ?? ''), lot_no: String(r.lot_no ?? ''), quantity: Number(r.quantity ?? 0), total_amount: Number(r.total_amount ?? 0), paid_amount: Number(r.paid_amount ?? 0), payment_status: String(r.payment_status ?? ''), delivery_status: String(r.delivery_status ?? ''), due_date: String(r.due_date ?? ''), is_returned: Boolean(r.is_returned ?? false) })))
+      setSales((saleRes.data ?? []).map((r: any) => ({ id: String(r.id), sale_date: String(r.sale_date ?? ''), farmer_name: String(r.farmer_name ?? r.farmer_id ?? '-'), variety_name: String(r.variety_name ?? r.variety_id ?? '-'), lot_id: String(r.lot_id ?? ''), lot_no: String(r.lot_no ?? ''), quantity: Number(r.quantity ?? 0), total_amount: Number(r.total_amount ?? 0), paid_amount: Number(r.paid_amount ?? 0), refund_amount: Number(r.refund_amount ?? 0), payment_status: String(r.payment_status ?? ''), delivery_status: String(r.delivery_status ?? ''), due_date: String(r.due_date ?? ''), is_returned: Boolean(r.is_returned ?? false), refund_status: String(r.refund_status ?? ''), refund_date: String(r.refund_date ?? '') })))
     } catch (e) { setError(e instanceof Error ? e.message : 'โหลดข้อมูลไม่สำเร็จ') }
     finally { setLoading(false) }
   }
@@ -90,10 +90,10 @@ export default function AdminSeedInvoice() {
       if (price <= 0) throw new Error('ราคาต้องมากกว่า 0')
       if (qty > saleLot.balance) throw new Error(`จำนวนขายเกิน Stock คงเหลือ (${saleLot.balance} ถุง)`)
       const nextBalance = saleLot.balance - qty
-      const row = { sale_date: form.saleDate, farmer_id: selectedFarmer.id, farmer_name: selectedFarmer.name, farmer_phone: selectedFarmer.phone, lot_id: saleLot.id, lot_no: saleLot.lotNo, variety_id: saleLot.varietyId, variety_name: saleLot.varietyName, quantity: qty, sell_price_per_bag: price, total_amount: total, paid_amount: paid, payment_status: paymentStatus, delivery_status: form.deliveryStatus, due_date: debt > 0 ? form.dueDate : null, is_returned: false }
+      const row = { sale_date: form.saleDate, farmer_id: selectedFarmer.id, farmer_name: selectedFarmer.name, farmer_phone: selectedFarmer.phone, lot_id: saleLot.id, lot_no: saleLot.lotNo, variety_id: saleLot.varietyId, variety_name: saleLot.varietyName, quantity: qty, sell_price_per_bag: price, total_amount: total, paid_amount: paid, refund_amount: 0, refund_status: null, payment_status: paymentStatus, delivery_status: form.deliveryStatus, due_date: debt > 0 ? form.dueDate : null, is_returned: false }
       if (!isSupabaseReady || !supabase) {
         setLots((prev) => prev.map((l) => l.id === saleLot.id ? { ...l, balance: nextBalance } : l))
-        setSales((prev) => [{ id: `mock-sale-${Date.now()}`, sale_date: row.sale_date, farmer_name: row.farmer_name, variety_name: row.variety_name, lot_id: row.lot_id, lot_no: row.lot_no, quantity: row.quantity, total_amount: row.total_amount, paid_amount: row.paid_amount, payment_status: row.payment_status, delivery_status: row.delivery_status, due_date: row.due_date ?? '', is_returned: false }, ...prev])
+        setSales((prev) => [{ id: `mock-sale-${Date.now()}`, sale_date: row.sale_date, farmer_name: row.farmer_name, variety_name: row.variety_name, lot_id: row.lot_id, lot_no: row.lot_no, quantity: row.quantity, total_amount: row.total_amount, paid_amount: row.paid_amount, refund_amount: 0, payment_status: row.payment_status, delivery_status: row.delivery_status, due_date: row.due_date ?? '', is_returned: false, refund_status: '' }, ...prev])
       } else {
         const { error: saleErr } = await supabase.from('seed_sales').insert(row)
         if (saleErr) throw new Error(`บันทึกขายไม่สำเร็จ: ${saleErr.message}`)
@@ -114,25 +114,44 @@ export default function AdminSeedInvoice() {
       const lot = lots.find((l) => l.id === sale.lot_id)
       if (!lot) throw new Error('ไม่พบ Lot เดิมสำหรับคืนสินค้า')
       const nextBalance = lot.balance + sale.quantity
+      const refundStatus = sale.paid_amount > 0 ? 'refund_required' : 'no_refund'
       if (!isSupabaseReady || !supabase || sale.id.startsWith('mock-')) {
         setLots((prev) => prev.map((l) => l.id === lot.id ? { ...l, balance: nextBalance } : l))
-        setSales((prev) => prev.map((s) => s.id === sale.id ? { ...s, is_returned: true, delivery_status: 'returned', payment_status: s.paid_amount > 0 ? 'refund_required' : 'cancelled' } : s))
+        setSales((prev) => prev.map((s) => s.id === sale.id ? { ...s, is_returned: true, delivery_status: 'returned', refund_status: refundStatus, refund_amount: 0, payment_status: s.paid_amount > 0 ? 'refund_required' : 'cancelled' } : s))
       } else {
         const { error: stockErr } = await supabase.from('seed_stock_lots').update({ quantity_balance: nextBalance, status: 'available' }).eq('id', lot.id)
         if (stockErr) throw new Error(`คืน Stock ไม่สำเร็จ: ${stockErr.message}`)
-        const { error: saleErr } = await supabase.from('seed_sales').update({ is_returned: true, delivery_status: 'returned', payment_status: sale.paid_amount > 0 ? 'refund_required' : 'cancelled' }).eq('id', sale.id)
+        const { error: saleErr } = await supabase.from('seed_sales').update({ is_returned: true, delivery_status: 'returned', refund_status: refundStatus, refund_amount: 0, payment_status: sale.paid_amount > 0 ? 'refund_required' : 'cancelled' }).eq('id', sale.id)
         if (saleErr) throw new Error(`อัปเดตรายการขายไม่สำเร็จ: ${saleErr.message}`)
         await load()
       }
-      setOk(`คืนสินค้าแล้ว และเพิ่ม Stock กลับเข้า Lot ${sale.lot_no}`)
+      setOk(sale.paid_amount > 0 ? `คืนสินค้าแล้ว รอคืนเงิน ${fmt(sale.paid_amount)} บาท` : `คืนสินค้าแล้ว ไม่มียอดเงินต้องคืน`)
     } catch (e) { setError(e instanceof Error ? e.message : 'คืนสินค้าไม่สำเร็จ') }
+    finally { setSaving(false) }
+  }
+
+  const refundSale = async (sale: SaleRow) => {
+    const remainRefund = Math.max(sale.paid_amount - (sale.refund_amount ?? 0), 0)
+    if (remainRefund <= 0) return
+    if (!confirm(`ยืนยันคืนเงิน ${fmt(remainRefund)} บาท ให้ ${sale.farmer_name}?`)) return
+    setSaving(true); setError(''); setOk('')
+    try {
+      if (!isSupabaseReady || !supabase || sale.id.startsWith('mock-')) {
+        setSales((prev) => prev.map((s) => s.id === sale.id ? { ...s, refund_amount: s.paid_amount, refund_status: 'refunded', refund_date: today(), payment_status: 'refunded' } : s))
+      } else {
+        const { error: saleErr } = await supabase.from('seed_sales').update({ refund_amount: sale.paid_amount, refund_status: 'refunded', refund_date: today(), payment_status: 'refunded' }).eq('id', sale.id)
+        if (saleErr) throw new Error(`บันทึกคืนเงินไม่สำเร็จ: ${saleErr.message}`)
+        await load()
+      }
+      setOk(`บันทึกคืนเงินแล้ว ${fmt(remainRefund)} บาท`)
+    } catch (e) { setError(e instanceof Error ? e.message : 'คืนเงินไม่สำเร็จ') }
     finally { setSaving(false) }
   }
 
   const shown = useMemo(() => sales.filter((s) => !search || `${s.farmer_name} ${s.variety_name} ${s.lot_no}`.toLowerCase().includes(search.toLowerCase())), [sales, search])
 
   return <div className="space-y-5">
-    <div className="flex items-center justify-between flex-wrap gap-3"><div><h1 className="text-xl font-bold text-gray-900">ขายเมล็ดพันธุ์ / Invoice</h1><div className="flex items-center gap-1.5 mt-0.5 text-sm">{isSupabaseReady ? <><Wifi className="w-3.5 h-3.5 text-emerald-600"/><span className="text-emerald-600">FIFO + Return + Stock</span></> : <><WifiOff className="w-3.5 h-3.5 text-amber-500"/><span className="text-amber-600">Mock data</span></>}</div></div><button onClick={() => void load()} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm hover:bg-gray-50"><RefreshCw className="w-4 h-4"/>รีโหลด</button></div>
+    <div className="flex items-center justify-between flex-wrap gap-3"><div><h1 className="text-xl font-bold text-gray-900">ขายเมล็ดพันธุ์ / Invoice</h1><div className="flex items-center gap-1.5 mt-0.5 text-sm">{isSupabaseReady ? <><Wifi className="w-3.5 h-3.5 text-emerald-600"/><span className="text-emerald-600">FIFO + Return + Refund</span></> : <><WifiOff className="w-3.5 h-3.5 text-amber-500"/><span className="text-amber-600">Mock data</span></>}</div></div><button onClick={() => void load()} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm hover:bg-gray-50"><RefreshCw className="w-4 h-4"/>รีโหลด</button></div>
     {ok && <div className="rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 text-sm flex gap-2"><Check className="w-4 h-4"/>{ok}</div>}
     {error && <div className="rounded-xl bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-sm flex gap-2"><AlertCircle className="w-4 h-4"/>{error}</div>}
     <form onSubmit={submit} className="bg-white rounded-2xl border border-gray-100 p-5 grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -150,6 +169,6 @@ export default function AdminSeedInvoice() {
       <button disabled={saving || overStock} className="md:col-span-4 bg-emerald-600 disabled:bg-gray-300 text-white rounded-xl py-3 font-bold flex justify-center gap-2"><FileText className="w-5 h-5" />{saving ? 'กำลังบันทึก...' : `บันทึกขาย / ตัด Stock ${mode === 'fifo' ? 'FIFO' : 'Manual'}`}</button>
     </form>
     <div className="flex gap-2"><div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"/><input value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="ค้นหารายการขาย" className="w-full pl-9 pr-3 py-2 border-2 border-gray-200 rounded-xl text-sm"/></div></div>
-    <div className="bg-white rounded-2xl border border-gray-100 overflow-x-auto"><table className="w-full text-sm"><thead><tr className="bg-gray-50 border-b text-xs text-gray-500"><th className="text-left p-3">วันที่</th><th className="text-left p-3">สมาชิก</th><th className="text-left p-3">พันธุ์</th><th className="text-left p-3">Lot</th><th className="text-right p-3">จำนวน</th><th className="text-right p-3">ยอดขาย</th><th className="text-center p-3">สถานะ</th><th className="text-center p-3">Action</th></tr></thead><tbody>{loading ? <tr><td colSpan={8} className="p-6 text-center text-gray-400">กำลังโหลด...</td></tr> : shown.length === 0 ? <tr><td colSpan={8} className="p-6 text-center text-gray-400">ยังไม่มีรายการขาย</td></tr> : shown.map((s)=><tr key={s.id} className="border-t"><td className="p-3">{s.sale_date}</td><td className="p-3 font-medium">{s.farmer_name}</td><td className="p-3">{s.variety_name}</td><td className="p-3">{s.lot_no}</td><td className="p-3 text-right">{fmt(s.quantity)}</td><td className="p-3 text-right">{fmt(s.total_amount)}</td><td className="p-3 text-center">{s.is_returned ? <span className="text-red-600 font-semibold">คืนแล้ว</span> : s.payment_status}</td><td className="p-3 text-center">{!s.is_returned ? <button disabled={saving} onClick={() => void returnSale(s)} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-orange-600 text-white text-xs font-semibold disabled:bg-gray-300"><RotateCcw className="w-3 h-3"/>คืนสินค้า</button> : <span className="text-gray-300">-</span>}</td></tr>)}</tbody></table></div>
+    <div className="bg-white rounded-2xl border border-gray-100 overflow-x-auto"><table className="w-full text-sm"><thead><tr className="bg-gray-50 border-b text-xs text-gray-500"><th className="text-left p-3">วันที่</th><th className="text-left p-3">สมาชิก</th><th className="text-left p-3">พันธุ์</th><th className="text-left p-3">Lot</th><th className="text-right p-3">ยอดขาย</th><th className="text-right p-3">จ่าย</th><th className="text-right p-3">คืนเงิน</th><th className="text-center p-3">สถานะ</th><th className="text-center p-3">Action</th></tr></thead><tbody>{loading ? <tr><td colSpan={9} className="p-6 text-center text-gray-400">กำลังโหลด...</td></tr> : shown.length === 0 ? <tr><td colSpan={9} className="p-6 text-center text-gray-400">ยังไม่มีรายการขาย</td></tr> : shown.map((s)=>{ const needRefund = s.is_returned && s.paid_amount > (s.refund_amount ?? 0); return <tr key={s.id} className="border-t"><td className="p-3">{s.sale_date}</td><td className="p-3 font-medium">{s.farmer_name}</td><td className="p-3">{s.variety_name}</td><td className="p-3">{s.lot_no}</td><td className="p-3 text-right">{fmt(s.total_amount)}</td><td className="p-3 text-right">{fmt(s.paid_amount)}</td><td className="p-3 text-right">{fmt(s.refund_amount ?? 0)}</td><td className="p-3 text-center">{s.refund_status === 'refunded' ? <span className="text-emerald-600 font-semibold">คืนเงินแล้ว</span> : needRefund ? <span className="text-orange-600 font-semibold">รอคืนเงิน</span> : s.is_returned ? <span className="text-red-600 font-semibold">คืนสินค้าแล้ว</span> : s.payment_status}</td><td className="p-3 text-center"><div className="flex justify-center gap-2 whitespace-nowrap">{!s.is_returned && <button disabled={saving} onClick={() => void returnSale(s)} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-orange-600 text-white text-xs font-semibold disabled:bg-gray-300"><RotateCcw className="w-3 h-3"/>คืนสินค้า</button>}{needRefund && <button disabled={saving} onClick={() => void refundSale(s)} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 text-white text-xs font-semibold disabled:bg-gray-300"><Banknote className="w-3 h-3"/>คืนเงิน</button>}{s.is_returned && !needRefund && <span className="text-gray-300">-</span>}</div></td></tr>})}</tbody></table></div>
   </div>
 }
