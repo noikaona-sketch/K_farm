@@ -44,7 +44,7 @@ import AdminRoles            from './app/admin/AdminRoles'
 import AdminSeedSuppliers    from './app/admin/AdminSeedSuppliers'
 import AdminSeedVarieties    from './app/admin/AdminSeedVarieties'
 import AdminSeedStock        from './app/admin/AdminSeedStock'
-import AdminSeedSales        from './app/admin/AdminSeedSales'
+import AdminSeedBooking      from './app/admin/AdminSeedBooking'
 import AdminSeedPOS          from './app/admin/AdminSeedPOS'
 import AdminSeedDebt         from './app/admin/AdminSeedDebt'
 import AdminServiceProviders from './app/admin/AdminServiceProviders'
@@ -126,7 +126,7 @@ export default function App() {
         <Route path="seed-suppliers" element={<AdminSeedSuppliers />} />
         <Route path="seed-varieties" element={<AdminSeedVarieties />} />
         <Route path="seed-stock" element={<AdminSeedStock />} />
-        <Route path="seed-sales" element={<AdminSeedSales />} />
+        <Route path="seed-sales" element={<AdminSeedBooking />} />
         <Route path="seed-invoice" element={<AdminSeedPOS />} />
         <Route path="seed-debt" element={<AdminSeedDebt />} />
         <Route path="service-providers" element={<AdminServiceProviders />} />
