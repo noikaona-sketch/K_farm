@@ -42,6 +42,25 @@ export default function AdminSeedPOS() {
   const selectedFarmer = farmers.find((f) => f.id === selectedFarmerId)
   const payment = calcPayment({ cart, paymentType, cashReceived: Number(cashReceived || 0), creditPaid: Number(creditPaid || 0) })
 
+  const loadBookingToPOS = (availableLots: PosLot[]) => {
+    const raw = window.localStorage.getItem('seed_booking_to_pos')
+    if (!raw) return
+    try {
+      const data = JSON.parse(raw)
+      const items: PosCartItem[] = Array.isArray(data.items) ? data.items.map((item: any) => {
+        const lot = availableLots.find((l) => l.id === String(item.id))
+        return { ...(lot ?? item), id: String(item.id), balance: Number(lot?.balance ?? item.balance ?? 0), price: Number(lot?.price ?? item.price ?? 0), qty: Number(item.qty ?? 0) }
+      }) : []
+      if (items.length > 0) setCart(items)
+      if (data.farmerId) setSelectedFarmerId(String(data.farmerId))
+      if (Number(data.depositAmount || 0) > 0) { setPaymentType('credit'); setCreditPaid(String(data.depositAmount || 0)) }
+      setOk(`โหลดใบจอง ${data.bookingNo ?? ''} เข้า POS แล้ว`)
+      window.localStorage.removeItem('seed_booking_to_pos')
+    } catch (e) {
+      setError('โหลดใบจองเข้า POS ไม่สำเร็จ')
+    }
+  }
+
   const loadMembers = async (): Promise<PosFarmer[]> => {
     if (!supabase) return MOCK_FARMERS
     const [farmerRes, profileRes] = await Promise.all([
@@ -62,7 +81,7 @@ export default function AdminSeedPOS() {
   const load = async () => {
     setLoading(true); setError('')
     try {
-      if (!isSupabaseReady || !supabase) { setFarmers(MOCK_FARMERS); setLots(MOCK_LOTS); setSales([]); return }
+      if (!isSupabaseReady || !supabase) { setFarmers(MOCK_FARMERS); setLots(MOCK_LOTS); setSales([]); loadBookingToPOS(MOCK_LOTS); return }
       const memberRows = await loadMembers()
       const [varietyRes, supplierRes, lotRes, saleRes] = await Promise.all([
         supabase.from('seed_varieties').select('id,variety_name,supplier_id,sell_price_per_bag,sell_price,price').order('variety_name'),
@@ -76,13 +95,15 @@ export default function AdminSeedPOS() {
       const varietyMap = new Map((varietyRes.data ?? []).map((v: any) => [String(v.id), v]))
       const supplierMap = new Map((supplierRes.data ?? []).map((s: any) => [String(s.id), String(s.supplier_name ?? '-')]))
       setFarmers(memberRows)
-      setLots((lotRes.data ?? []).map((r: any) => {
+      const nextLots = (lotRes.data ?? []).map((r: any) => {
         const v: any = varietyMap.get(String(r.variety_id))
         const supplierId = String(r.supplier_id ?? v?.supplier_id ?? '')
         const salePrice = Number(v?.sell_price_per_bag ?? v?.sell_price ?? v?.price ?? 0)
         return { id: String(r.id), supplierId, supplierName: String(r.supplier_name ?? supplierMap.get(supplierId) ?? '-'), varietyId: String(r.variety_id ?? ''), varietyName: String(r.variety_name ?? v?.variety_name ?? '-'), lotNo: String(r.lot_no ?? '-'), balance: Number(r.quantity_balance ?? 0), price: salePrice, createdAt: String(r.created_at ?? '') }
-      }))
+      })
+      setLots(nextLots)
       setSales((saleRes.data ?? []).map((r: any) => ({ id: String(r.id), sale_date: String(r.sale_date ?? ''), farmer_name: String(r.farmer_name ?? '-'), farmer_phone: String(r.farmer_phone ?? ''), variety_name: String(r.variety_name ?? '-'), lot_no: String(r.lot_no ?? ''), quantity: Number(r.quantity ?? 0), total_amount: Number(r.total_amount ?? 0), paid_amount: Number(r.paid_amount ?? 0), payment_status: String(r.payment_status ?? ''), delivery_status: String(r.delivery_status ?? ''), delivered_quantity: Number(r.delivered_quantity ?? r.quantity ?? 0), pending_delivery_qty: Number(r.pending_delivery_qty ?? 0), returned_quantity: Number(r.returned_quantity ?? 0), return_status: String(r.return_status ?? 'normal'), lot_id: String(r.lot_id ?? ''), invoice_no: String(r.invoice_no ?? ''), seller_name: String(r.seller_name ?? '') })))
+      loadBookingToPOS(nextLots)
     } catch (e) { setError(e instanceof Error ? e.message : 'โหลดข้อมูลไม่สำเร็จ') } finally { setLoading(false) }
   }
 
