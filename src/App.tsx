@@ -6,6 +6,7 @@ import type { AppRole } from './lib/roles'
 import MobileLayout from './layouts/MobileLayout'
 import AdminLayout  from './layouts/AdminLayout'
 import AdminRoute   from './routes/AdminRoute'
+import RequirePermission from './routes/RequirePermission'
 import MemberSeedBookingMobile from './app/farmer/MemberSeedBookingMobile'
 import MemberSeedBookingHistory from './app/farmer/MemberSeedBookingHistory'
 
@@ -123,31 +124,31 @@ export default function App() {
       </Route>
 
       <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
-        <Route index element={<AdminDashboard />} />
-        <Route path="members" element={<AdminMembers />} />
-        <Route path="member-import" element={<AdminMemberImport />} />
-        <Route path="roles" element={<AdminRoles />} />
-        <Route path="seed-suppliers" element={<AdminSeedSuppliers />} />
-        <Route path="seed-varieties" element={<AdminSeedVarieties />} />
-        <Route path="seed-stock" element={<AdminSeedStock />} />
-        <Route path="seed-sales" element={<AdminSeedBooking />} />
-        <Route path="seed-invoice" element={<AdminSeedPOS />} />
-        <Route path="seed-debt" element={<AdminSeedDebt />} />
-        <Route path="service-providers" element={<AdminServiceProviders />} />
-        <Route path="field-inspections" element={<AdminFieldInspections />} />
-        <Route path="reports" element={<AdminReports />} />
-        <Route path="crop-cycle" element={<AdminPlaceholderPage title="วงจรเกษตรสมาชิก" icon="🔁" items={["วางแผนปลูก", "ติดตามสถานะ", "ผลผลิตคาดการณ์"]} />} />
-        <Route path="planting-cycle" element={<AdminPlaceholderPage title="วงจรการปลูก" icon="🌱" />} />
-        <Route path="activity" element={<AdminPlaceholderPage title="กิจกรรมไม่เผา" icon="🔥" />} />
-        <Route path="calendar" element={<AdminPlaceholderPage title="ปฏิทินงานภาคสนาม" icon="📅" />} />
-        <Route path="harvest" element={<AdminPlaceholderPage title="นัดขาย / คิวรับซื้อ" icon="🧾" />} />
-        <Route path="quality" element={<AdminPlaceholderPage title="คุณภาพผลผลิต" icon="✅" />} />
-        <Route path="vehicle-schedule" element={<AdminPlaceholderPage title="นัดรถ" icon="🚛" />} />
-        <Route path="service-review" element={<AdminPlaceholderPage title="ประเมินผู้ให้บริการ" icon="⭐" />} />
-        <Route path="settings" element={<AdminPlaceholderPage title="ตั้งค่า" icon="⚙️" />} />
-        <Route path="farmers" element={<AdminFarmers />} />
-        <Route path="map" element={<AdminMap />} />
-        <Route path="prices" element={<AdminPrices />} />
+        <Route index element={<RequirePermission permission="member.view" fallback="/admin"><AdminDashboard /></RequirePermission>} />
+        <Route path="members" element={<RequirePermission permission="member.view" fallback="/admin"><AdminMembers /></RequirePermission>} />
+        <Route path="member-import" element={<RequirePermission permission="member.import" fallback="/admin"><AdminMemberImport /></RequirePermission>} />
+        <Route path="roles" element={<RequirePermission permission="system.roles" fallback="/admin"><AdminRoles /></RequirePermission>} />
+        <Route path="seed-suppliers" element={<RequirePermission permission="seed.edit" fallback="/admin"><AdminSeedSuppliers /></RequirePermission>} />
+        <Route path="seed-varieties" element={<RequirePermission permission="seed.edit" fallback="/admin"><AdminSeedVarieties /></RequirePermission>} />
+        <Route path="seed-stock" element={<RequirePermission permission="seed.stock" fallback="/admin"><AdminSeedStock /></RequirePermission>} />
+        <Route path="seed-sales" element={<RequirePermission permission="seed.sales" fallback="/admin"><AdminSeedBooking /></RequirePermission>} />
+        <Route path="seed-invoice" element={<RequirePermission permission="seed.sales" fallback="/admin"><AdminSeedPOS /></RequirePermission>} />
+        <Route path="seed-debt" element={<RequirePermission permission="seed.debt" fallback="/admin"><AdminSeedDebt /></RequirePermission>} />
+        <Route path="service-providers" element={<RequirePermission permission="service.view" fallback="/admin"><AdminServiceProviders /></RequirePermission>} />
+        <Route path="field-inspections" element={<RequirePermission permission="inspection.view" fallback="/admin"><AdminFieldInspections /></RequirePermission>} />
+        <Route path="reports" element={<RequirePermission permission="report.view" fallback="/admin"><AdminReports /></RequirePermission>} />
+        <Route path="crop-cycle" element={<RequirePermission permission="inspection.view" fallback="/admin"><AdminPlaceholderPage title="วงจรเกษตรสมาชิก" icon="🔁" items={["วางแผนปลูก", "ติดตามสถานะ", "ผลผลิตคาดการณ์"]} /></RequirePermission>} />
+        <Route path="planting-cycle" element={<RequirePermission permission="inspection.view" fallback="/admin"><AdminPlaceholderPage title="วงจรการปลูก" icon="🌱" /></RequirePermission>} />
+        <Route path="activity" element={<RequirePermission permission="inspection.view" fallback="/admin"><AdminPlaceholderPage title="กิจกรรมไม่เผา" icon="🔥" /></RequirePermission>} />
+        <Route path="calendar" element={<RequirePermission permission="inspection.view" fallback="/admin"><AdminPlaceholderPage title="ปฏิทินงานภาคสนาม" icon="📅" /></RequirePermission>} />
+        <Route path="harvest" element={<RequirePermission permission="inspection.view" fallback="/admin"><AdminPlaceholderPage title="นัดขาย / คิวรับซื้อ" icon="🧾" /></RequirePermission>} />
+        <Route path="quality" element={<RequirePermission permission="inspection.view" fallback="/admin"><AdminPlaceholderPage title="คุณภาพผลผลิต" icon="✅" /></RequirePermission>} />
+        <Route path="vehicle-schedule" element={<RequirePermission permission="service.view" fallback="/admin"><AdminPlaceholderPage title="นัดรถ" icon="🚛" /></RequirePermission>} />
+        <Route path="service-review" element={<RequirePermission permission="service.view" fallback="/admin"><AdminPlaceholderPage title="ประเมินผู้ให้บริการ" icon="⭐" /></RequirePermission>} />
+        <Route path="settings" element={<RequirePermission permission="system.roles" fallback="/admin"><AdminPlaceholderPage title="ตั้งค่า" icon="⚙️" /></RequirePermission>} />
+        <Route path="farmers" element={<RequirePermission permission="member.approve" fallback="/admin"><AdminFarmers /></RequirePermission>} />
+        <Route path="map" element={<RequirePermission permission="inspection.view" fallback="/admin"><AdminMap /></RequirePermission>} />
+        <Route path="prices" element={<RequirePermission permission="price.edit" fallback="/admin"><AdminPrices /></RequirePermission>} />
       </Route>
 
       <Route path="*" element={<Navigate to="/login" replace />} />
