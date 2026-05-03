@@ -4,6 +4,7 @@ import { isSupabaseReady, supabase } from '../../lib/supabase'
 import SeedPOSProductGrid from './SeedPOSProductGrid'
 import SeedPOSCart from './SeedPOSCart'
 import SeedPOSHistoryActions from './SeedPOSHistoryActions'
+import SeedPOSSalesSummary from './SeedPOSSalesSummary'
 import type { PosCartItem, PosFarmer, PosLot, PosPaymentType, PosSaleRow } from './seedPosTypes'
 import { addDaysDate, todayDate, fmtMoney } from './seedPosTypes'
 import { addLotToCart, calcDeliveryQty, calcPayment, validateCartSale } from './seedPosLogic'
@@ -31,6 +32,8 @@ export default function AdminSeedPOS() {
   const [creditPaid, setCreditPaid] = useState('0')
   const [dueDate, setDueDate] = useState(addDaysDate(15))
   const [saleDate, setSaleDate] = useState(todayDate())
+  const [historyStartDate, setHistoryStartDate] = useState('')
+  const [historyEndDate, setHistoryEndDate] = useState('')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [ok, setOk] = useState('')
@@ -65,7 +68,7 @@ export default function AdminSeedPOS() {
         supabase.from('seed_varieties').select('id,variety_name,supplier_id,sell_price_per_bag,sell_price,price').order('variety_name'),
         supabase.from('seed_suppliers').select('id,supplier_name'),
         supabase.from('seed_stock_lots').select('id,supplier_id,supplier_name,variety_id,variety_name,lot_no,quantity_balance,created_at,status').gt('quantity_balance', 0).neq('status', 'inactive').order('created_at', { ascending: true }),
-        supabase.from('seed_sales').select('*').order('sale_date', { ascending: false }).limit(20),
+        supabase.from('seed_sales').select('*').order('sale_date', { ascending: false }).limit(200),
       ])
       if (varietyRes.error) throw new Error(varietyRes.error.message)
       if (lotRes.error) throw new Error(lotRes.error.message)
@@ -87,6 +90,7 @@ export default function AdminSeedPOS() {
 
   const suppliers = useMemo(() => Array.from(new Map(lots.map((l) => [l.supplierId || '-', l.supplierName || '-'])).entries()).map(([id, name]) => ({ id, name })), [lots])
   const filteredLots = useMemo(() => { const kw = productSearch.trim().toLowerCase(); return lots.filter((l) => (supplierFilter === 'all' || (l.supplierId || '-') === supplierFilter) && (!kw || `${l.varietyName} ${l.lotNo} ${l.supplierName}`.toLowerCase().includes(kw))) }, [lots, supplierFilter, productSearch])
+  const filteredSales = useMemo(() => sales.filter((s) => (!historyStartDate || s.sale_date >= historyStartDate) && (!historyEndDate || s.sale_date <= historyEndDate)), [sales, historyStartDate, historyEndDate])
 
   const clearCart = () => { setCart([]); setCashReceived(''); setCreditPaid('0'); setError(''); setOk('') }
 
@@ -164,7 +168,8 @@ export default function AdminSeedPOS() {
       {ok && <div className="rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 text-sm flex gap-2"><Check className="w-4 h-4"/>{ok}</div>}
       {error && <div className="rounded-xl bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-sm flex gap-2"><AlertCircle className="w-4 h-4"/>{error}</div>}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5"><div className="xl:col-span-2"><SeedPOSProductGrid lots={filteredLots} suppliers={suppliers} supplierFilter={supplierFilter} productSearch={productSearch} onSupplierFilterChange={setSupplierFilter} onProductSearchChange={setProductSearch} onAddToCart={(lot) => setCart((prev) => addLotToCart(prev, lot))} /></div><SeedPOSCart cart={cart} farmers={farmers} selectedFarmerId={selectedFarmerId} paymentType={paymentType} cashReceived={cashReceived} creditPaid={creditPaid} dueDate={dueDate} saleDate={saleDate} saving={saving} total={payment.total} change={payment.change} debt={payment.debt} onCartChange={setCart} onFarmerChange={setSelectedFarmerId} onPaymentTypeChange={setPaymentType} onCashReceivedChange={setCashReceived} onCreditPaidChange={setCreditPaid} onDueDateChange={setDueDate} onSaleDateChange={setSaleDate} onClear={clearCart} onSubmit={submitSale} /></div>
-      <div className="bg-white rounded-2xl border overflow-x-auto"><table className="w-full text-sm"><thead><tr className="bg-gray-50 text-xs text-gray-500"><th className="text-left p-3">วันที่</th><th className="text-left p-3">สมาชิก</th><th className="text-left p-3">พันธุ์</th><th className="text-left p-3">Lot</th><th className="text-right p-3">ขาย</th><th className="text-right p-3">ส่งแล้ว</th><th className="text-right p-3">ค้างส่ง</th><th className="text-right p-3">คืนแล้ว</th><th className="text-right p-3">ยอดขาย</th><th className="text-center p-3">จัดการ</th></tr></thead><tbody>{loading ? <tr><td colSpan={10} className="p-6 text-center text-gray-400">กำลังโหลด...</td></tr> : sales.length === 0 ? <tr><td colSpan={10} className="p-6 text-center text-gray-400">ยังไม่มีรายการขาย</td></tr> : sales.map((s) => <tr key={s.id} className="border-t"><td className="p-3">{s.sale_date}</td><td className="p-3">{s.farmer_name}</td><td className="p-3">{s.variety_name}</td><td className="p-3">{s.lot_no}</td><td className="p-3 text-right">{s.quantity}</td><td className="p-3 text-right">{s.delivered_quantity ?? s.quantity}</td><td className="p-3 text-right text-red-600 font-semibold">{s.pending_delivery_qty ?? 0}</td><td className="p-3 text-right text-orange-600 font-semibold">{s.returned_quantity ?? 0}</td><td className="p-3 text-right">{fmtMoney(s.total_amount)}</td><td className="p-3"><SeedPOSHistoryActions sale={s} disabled={saving} onDeliverMore={handleDeliverMore} onReturnPartial={handleReturnPartial} /></td></tr>)}</tbody></table></div>
+      <SeedPOSSalesSummary sales={filteredSales} startDate={historyStartDate} endDate={historyEndDate} onStartDateChange={setHistoryStartDate} onEndDateChange={setHistoryEndDate} />
+      <div className="bg-white rounded-2xl border overflow-x-auto"><table className="w-full text-sm"><thead><tr className="bg-gray-50 text-xs text-gray-500"><th className="text-left p-3">วันที่</th><th className="text-left p-3">สมาชิก</th><th className="text-left p-3">พันธุ์</th><th className="text-left p-3">Lot</th><th className="text-right p-3">ขาย</th><th className="text-right p-3">ส่งแล้ว</th><th className="text-right p-3">ค้างส่ง</th><th className="text-right p-3">คืนแล้ว</th><th className="text-right p-3">ยอดขาย</th><th className="text-center p-3">จัดการ</th></tr></thead><tbody>{loading ? <tr><td colSpan={10} className="p-6 text-center text-gray-400">กำลังโหลด...</td></tr> : filteredSales.length === 0 ? <tr><td colSpan={10} className="p-6 text-center text-gray-400">ยังไม่มีรายการขายในช่วงวันที่นี้</td></tr> : filteredSales.map((s) => <tr key={s.id} className="border-t"><td className="p-3">{s.sale_date}</td><td className="p-3">{s.farmer_name}</td><td className="p-3">{s.variety_name}</td><td className="p-3">{s.lot_no}</td><td className="p-3 text-right">{s.quantity}</td><td className="p-3 text-right">{s.delivered_quantity ?? s.quantity}</td><td className="p-3 text-right text-red-600 font-semibold">{s.pending_delivery_qty ?? 0}</td><td className="p-3 text-right text-orange-600 font-semibold">{s.returned_quantity ?? 0}</td><td className="p-3 text-right">{fmtMoney(s.total_amount)}</td><td className="p-3"><SeedPOSHistoryActions sale={s} disabled={saving} onDeliverMore={handleDeliverMore} onReturnPartial={handleReturnPartial} /></td></tr>)}</tbody></table></div>
     </div>
   )
 }
