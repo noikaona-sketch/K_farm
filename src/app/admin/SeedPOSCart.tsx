@@ -1,12 +1,13 @@
 import React, { useMemo, useState } from 'react'
 import { CreditCard, Package, Search, ShoppingCart, Trash2 } from 'lucide-react'
-import type { PosCartItem, PosFarmer, PosPaymentType } from './seedPosTypes'
+import type { PosCartItem, PosFarmer, PosLot, PosPaymentType } from './seedPosTypes'
 import { fmtMoney } from './seedPosTypes'
 import { removeCartItem, updateCartQty } from './seedPosLogic'
 
 type Props = {
   cart: PosCartItem[]
   farmers: PosFarmer[]
+  availableLots?: PosLot[]
   selectedFarmerId: string
   paymentType: PosPaymentType
   cashReceived: string
@@ -28,9 +29,28 @@ type Props = {
   onSubmit: () => void
 }
 
+function changeCartItemLot(cart: PosCartItem[], oldLotId: string, newLot: PosLot): PosCartItem[] {
+  return cart.map((item) => {
+    if (item.id !== oldLotId) return item
+    return {
+      ...item,
+      id: newLot.id,
+      supplierId: newLot.supplierId,
+      supplierName: newLot.supplierName,
+      varietyId: newLot.varietyId,
+      varietyName: newLot.varietyName,
+      lotNo: newLot.lotNo,
+      balance: newLot.balance,
+      price: newLot.price,
+      createdAt: newLot.createdAt,
+    }
+  })
+}
+
 export default function SeedPOSCart({
   cart,
   farmers,
+  availableLots = [],
   selectedFarmerId,
   paymentType,
   cashReceived,
@@ -88,24 +108,44 @@ export default function SeedPOSCart({
       </div>
 
       <div className="space-y-2 max-h-72 overflow-y-auto">
-        {cart.map((item) => (
-          <div key={item.id} className="border rounded-xl p-3">
-            <div className="flex justify-between gap-2">
-              <div>
-                <div className="font-semibold">{item.varietyName}</div>
-                <div className="text-xs text-gray-500">{item.lotNo}</div>
+        {cart.map((item) => {
+          const sameVarietyLots = availableLots.filter((lot) => lot.varietyId === item.varietyId)
+          return (
+            <div key={item.id} className="border rounded-xl p-3">
+              <div className="flex justify-between gap-2">
+                <div className="flex-1">
+                  <div className="font-semibold">{item.varietyName}</div>
+                  {sameVarietyLots.length > 0 ? (
+                    <select
+                      value={item.id}
+                      onChange={(e) => {
+                        const newLot = sameVarietyLots.find((lot) => lot.id === e.target.value)
+                        if (newLot) onCartChange(changeCartItemLot(cart, item.id, newLot))
+                      }}
+                      className="mt-1 w-full border rounded-lg p-1 text-xs bg-white"
+                    >
+                      {sameVarietyLots.map((lot) => (
+                        <option key={lot.id} value={lot.id}>{lot.lotNo} | Stock {lot.balance} | {fmtMoney(lot.price)}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="text-xs text-gray-500">{item.lotNo}</div>
+                  )}
+                  <div className="text-xs text-gray-500 mt-1">Stock lot นี้: {fmtMoney(item.balance)} ถุง</div>
+                </div>
+                <button type="button" onClick={() => onCartChange(removeCartItem(cart, item.id))} className="text-red-500">
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
-              <button type="button" onClick={() => onCartChange(removeCartItem(cart, item.id))} className="text-red-500">
-                <Trash2 className="w-4 h-4" />
-              </button>
+              <div className="mt-2 grid grid-cols-3 gap-2 items-center">
+                <input type="number" min="1" value={item.qty} onChange={(e) => onCartChange(updateCartQty(cart, item.id, Number(e.target.value)))} className="border rounded-lg p-1 text-center" />
+                <div className="text-right text-sm">x {fmtMoney(item.price)}</div>
+                <div className="text-right font-bold">{fmtMoney(item.qty * item.price)}</div>
+              </div>
+              {item.qty > item.balance && <div className="mt-2 text-xs text-red-600">จำนวนเกิน stock จะบันทึกเป็นค้างส่ง</div>}
             </div>
-            <div className="mt-2 grid grid-cols-3 gap-2 items-center">
-              <input type="number" min="1" max={item.balance} value={item.qty} onChange={(e) => onCartChange(updateCartQty(cart, item.id, Number(e.target.value)))} className="border rounded-lg p-1 text-center" />
-              <div className="text-right text-sm">x {fmtMoney(item.price)}</div>
-              <div className="text-right font-bold">{fmtMoney(item.qty * item.price)}</div>
-            </div>
-          </div>
-        ))}
+          )
+        })}
         {cart.length === 0 && <div className="text-center text-gray-400 py-8"><Package className="w-8 h-8 mx-auto mb-2 opacity-40" />ยังไม่มีสินค้า</div>}
       </div>
 
