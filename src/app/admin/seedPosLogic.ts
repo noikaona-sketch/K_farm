@@ -5,7 +5,7 @@ export function addLotToCart(cart: PosCartItem[], lot: PosLot): PosCartItem[] {
   if (found) {
     return cart.map((item) =>
       item.id === lot.id
-        ? { ...item, qty: Math.min(item.qty + 1, item.balance) }
+        ? { ...item, qty: item.qty + 1 }
         : item
     )
   }
@@ -19,7 +19,7 @@ export function removeCartItem(cart: PosCartItem[], lotId: string): PosCartItem[
 export function updateCartQty(cart: PosCartItem[], lotId: string, qty: number): PosCartItem[] {
   return cart.map((item) => {
     if (item.id !== lotId) return item
-    const safeQty = Math.max(1, Math.min(Number(qty || 1), item.balance))
+    const safeQty = Math.max(1, Number(qty || 1))
     return { ...item, qty: safeQty }
   })
 }
@@ -43,6 +43,14 @@ export function calcPayment(params: {
   return { total, paid, change, debt, paymentStatus }
 }
 
+export function calcDeliveryQty(item: PosCartItem) {
+  const deliveredQty = Math.min(item.qty, Math.max(item.balance, 0))
+  const pendingDeliveryQty = Math.max(item.qty - deliveredQty, 0)
+  const nextBalance = Math.max(item.balance - item.qty, 0)
+  const deliveryStatus = pendingDeliveryQty > 0 ? 'partial_pending' : 'delivered'
+  return { deliveredQty, pendingDeliveryQty, nextBalance, deliveryStatus }
+}
+
 export function validateCartSale(params: {
   cart: PosCartItem[]
   hasFarmer: boolean
@@ -52,7 +60,6 @@ export function validateCartSale(params: {
   const total = calcCartTotal(params.cart)
   if (!params.hasFarmer) return 'กรุณาเลือกสมาชิก'
   if (params.cart.length === 0) return 'กรุณาเลือกสินค้า'
-  if (params.cart.some((item) => item.qty > item.balance)) return 'จำนวนขายเกิน stock'
   if (params.paymentType === 'cash' && Number(params.cashReceived || 0) < total) return 'เงินรับน้อยกว่ายอดขาย'
   return ''
 }
