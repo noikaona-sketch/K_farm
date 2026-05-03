@@ -2,18 +2,19 @@
  * K-Farm Role System — single source of truth
  *
  * Hierarchy (high → low):
- *   admin > leader > inspector > farmer > member
+ *   admin > leader > inspector > field > farmer > member
  */
 
-export type AppRole = 'member' | 'farmer' | 'leader' | 'inspector' | 'admin'
+export type AppRole = 'member' | 'farmer' | 'field' | 'leader' | 'inspector' | 'admin'
 
 // Numeric level — higher = more access
 const LEVEL: Record<AppRole, number> = {
   member:    0,
   farmer:    1,
-  inspector: 2,
-  leader:    3,
-  admin:     4,
+  field:     2,
+  inspector: 3,
+  leader:    4,
+  admin:     5,
 }
 
 /** Is role A at least as powerful as role B? */
@@ -33,6 +34,7 @@ export type Feature =
   | 'profile'        // แก้ไขข้อมูลส่วนตัว
   | 'prices'         // ดูราคา
   | 'register'       // สมัครสมาชิก
+  | 'field_work'     // งานภาคสนาม
   | 'leader_approve' // อนุมัติแปลง / สมาชิก
   | 'inspection'     // ตรวจสอบแปลง
   | 'admin_panel'    // admin dashboard
@@ -43,6 +45,7 @@ const FEATURE_REQUIRED: Record<Feature, AppRole> = {
   profile:        'member',
   prices:         'member',
   farming:        'farmer',
+  field_work:     'field',
   inspection:     'inspector',
   leader_approve: 'leader',
   admin_panel:    'admin',
@@ -66,6 +69,12 @@ export const ROLE_TABS: Record<AppRole, readonly { to: string; label: string; ic
     { to: '/farmer/status',    label: 'สถานะ',    icon: '📋', end: false },
     { to: '/farmer/prices',    label: 'ราคา',     icon: '💰', end: false },
   ],
+  field: [
+    { to: '/field', label: 'งานสนาม', icon: '📋', end: true },
+    { to: '/field/seed-booking', label: 'จองเมล็ด', icon: '🌾', end: false },
+    { to: '/field/farm-inspection', label: 'ตรวจแปลง', icon: '🔍', end: false },
+    { to: '/field/no-burn', label: 'ไม่เผา', icon: '🚫', end: false },
+  ],
   leader: [
     { to: '/leader',           label: 'หน้าแรก',  icon: '🏠', end: true },
     { to: '/leader/confirm',   label: 'อนุมัติ',  icon: '✅', end: false },
@@ -87,6 +96,7 @@ export const ROLE_TABS: Record<AppRole, readonly { to: string; label: string; ic
 export const ROLE_HOME: Record<AppRole, string> = {
   member:    '/farmer',
   farmer:    '/farmer',
+  field:     '/field',
   leader:    '/leader',
   inspector: '/inspector',
   admin:     '/admin',
@@ -96,6 +106,7 @@ export const ROLE_HOME: Record<AppRole, string> = {
 export const ROLE_LABEL: Record<AppRole, string> = {
   member:    'สมาชิกใหม่',
   farmer:    'เกษตรกร',
+  field:     'ทีมภาคสนาม',
   leader:    'หัวหน้ากลุ่ม',
   inspector: 'เจ้าหน้าที่ตรวจสอบ',
   admin:     'ผู้ดูแลระบบ',
@@ -105,6 +116,7 @@ export const ROLE_LABEL: Record<AppRole, string> = {
 export const ROLE_COLOR: Record<AppRole, string> = {
   member:    'bg-gray-100 text-gray-600',
   farmer:    'bg-emerald-100 text-emerald-700',
+  field:     'bg-teal-100 text-teal-700',
   leader:    'bg-amber-100 text-amber-700',
   inspector: 'bg-blue-100 text-blue-700',
   admin:     'bg-purple-100 text-purple-700',
