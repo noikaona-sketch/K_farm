@@ -67,8 +67,9 @@ export const ROLE_TABS: Record<AppRole, readonly { to: string; label: string; ic
     { to: '/farmer/prices',    label: 'ราคา',     icon: '💰', end: false },
   ],
   leader: [
-    { to: '/leader',          label: 'หน้าแรก',  icon: '🏠', end: true },
-    { to: '/leader/confirm',  label: 'อนุมัติ',  icon: '✅', end: false },
+    { to: '/leader',           label: 'หน้าแรก',  icon: '🏠', end: true },
+    { to: '/leader/confirm',   label: 'อนุมัติ',  icon: '✅', end: false },
+    { to: '/leader/bookings',  label: 'จองเมล็ด', icon: '🌾', end: false },
   ],
   inspector: [
     { to: '/inspector',       label: 'งานของฉัน', icon: '📋', end: true },

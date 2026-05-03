@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../routes/AuthContext'
 import { canAccess } from '../../lib/roles'
-import { Camera, FileText, MapPin, Clock, DollarSign, ImagePlus, Sprout, Calendar, Crown, Leaf, Lock } from 'lucide-react'
+import { Camera, FileText, MapPin, Clock, DollarSign, ImagePlus, Sprout, Calendar, Crown, Leaf, Lock, Package } from 'lucide-react'
 import { MOCK_FARMS, MOCK_PLANTING_RECORDS, MOCK_PRICES, TIER_CONFIG } from '../../data/mockData'
 import { ROLE_LABEL, ROLE_COLOR } from '../../lib/roles'
 
@@ -37,6 +37,7 @@ export default function FarmerDashboard() {
     { Icon: MapPin,     label: 'ปักหมุด',      sub: 'แจ้งที่ตั้งแปลง',       page: '/farmer/pin',      locked: !hasFarming, bg: 'bg-blue-50',    color: 'text-blue-600' },
     { Icon: Sprout,     label: 'แจ้งปลูก',     sub: 'บันทึกรอบการปลูก',     page: '/farmer/planting', locked: !hasFarming, bg: 'bg-green-50',   color: 'text-green-600' },
     { Icon: Leaf,       label: 'พันธุ์',        sub: 'ข้อมูลเมล็ด+พี่เลี้ยง', page: '/farmer/seeds',    locked: false,       bg: 'bg-lime-50',    color: 'text-lime-600' },
+    { Icon: Package,    label: 'จองเมล็ด',     sub: 'จองเมล็ดพันธุ์',       page: '/farmer/seed-booking', locked: false,   bg: 'bg-emerald-50', color: 'text-emerald-600' },
     { Icon: Calendar,   label: 'จองคิว',       sub: 'นัดวันขาย',             page: '/farmer/planting', locked: !hasFarming, bg: 'bg-purple-50',  color: 'text-purple-600' },
     { Icon: DollarSign, label: 'ราคา',          sub: 'ราคาตามพันธุ์',         page: '/farmer/prices',   locked: false,       bg: 'bg-rose-50',    color: 'text-rose-600' },
     { Icon: ImagePlus,  label: 'ส่งรูป',        sub: 'รูปแปลง/ไม่เผา',       page: '/farmer/planting', locked: !hasFarming, bg: 'bg-cyan-50',    color: 'text-cyan-600' },

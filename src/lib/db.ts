@@ -1023,3 +1023,182 @@ export async function upsertMember(row: ImportRow): Promise<'inserted' | 'update
     return 'inserted'
   }
 }
+
+
+// ── Seed Bookings ─────────────────────────────────────────────────────────────
+
+export type BookingStatus = 'pending' | 'confirmed' | 'received' | 'cancelled'
+
+export interface SeedBooking {
+  id: string
+  profile_id: string
+  variety_id: string
+  variety_name: string
+  quantity_kg: number
+  booked_by: string | null
+  booked_by_role: 'self' | 'sales' | 'leader' | null
+  pickup_date: string | null
+  pickup_note: string | null
+  status: BookingStatus
+  stock_deducted: boolean
+  price_per_kg: number | null
+  total_price: number | null
+  admin_note: string | null
+  created_at: string
+  updated_at: string
+  // joined
+  member_name?: string
+  member_phone?: string
+  member_code?: string
+}
+
+export interface CreateBookingPayload {
+  profile_id: string        // สมาชิกที่จอง
+  variety_id: string
+  variety_name: string
+  quantity_kg: number
+  booked_by: string         // ผู้กดจอง (อาจเป็นคนเดียวกัน)
+  booked_by_role: 'self' | 'sales' | 'leader'
+  pickup_date?: string
+  pickup_note?: string
+  price_per_kg?: number
+}
+
+const MOCK_BOOKINGS: SeedBooking[] = [
+  {
+    id: 'bk1', profile_id: 'mock-p1', variety_id: 'sv1', variety_name: 'PAC339',
+    quantity_kg: 7, booked_by: 'mock-p1', booked_by_role: 'self',
+    pickup_date: '2025-06-01', pickup_note: 'รับช่วงเช้า',
+    status: 'confirmed', stock_deducted: false,
+    price_per_kg: 120, total_price: 840, admin_note: null,
+    created_at: '2025-05-01T08:00:00Z', updated_at: '2025-05-01T08:00:00Z',
+    member_name: 'สมชาย ใจดี', member_phone: '0812345678', member_code: 'KF001',
+  },
+  {
+    id: 'bk2', profile_id: 'mock-p2', variety_id: 'sv2', variety_name: 'NK7328',
+    quantity_kg: 14, booked_by: 'mock-leader', booked_by_role: 'leader',
+    pickup_date: '2025-06-03', pickup_note: null,
+    status: 'pending', stock_deducted: false,
+    price_per_kg: 130, total_price: 1820, admin_note: null,
+    created_at: '2025-05-02T10:00:00Z', updated_at: '2025-05-02T10:00:00Z',
+    member_name: 'นภา ฟ้าใส', member_phone: '0898765432', member_code: 'KF002',
+  },
+]
+
+/** สมาชิกจองเอง / ทีมขาย / leader จองให้ */
+export async function createBooking(
+  payload: CreateBookingPayload
+): Promise<DbResult<{ id: string }>> {
+  if (!supabase) {
+    console.info('[mock] createBooking', payload)
+    return { data: { id: 'mock-bk-' + Date.now() }, error: null, source: 'mock' }
+  }
+  const { data, error } = await supabase
+    .from('seed_bookings')
+    .insert({
+      profile_id:     payload.profile_id,
+      variety_id:     payload.variety_id,
+      variety_name:   payload.variety_name,
+      quantity_kg:    payload.quantity_kg,
+      booked_by:      payload.booked_by,
+      booked_by_role: payload.booked_by_role,
+      pickup_date:    payload.pickup_date ?? null,
+      pickup_note:    payload.pickup_note ?? null,
+      price_per_kg:   payload.price_per_kg ?? null,
+      status:         'pending',
+    })
+    .select('id')
+    .single()
+  if (error) logSupabaseError('createBooking', error)
+  return { data, error: error?.message ?? null, source: 'supabase' }
+}
+
+/** ดึงรายการจองของสมาชิกคนเดียว (หน้า LINE) */
+export async function fetchMyBookings(
+  profileId: string
+): Promise<DbResult<SeedBooking[]>> {
+  if (!supabase) {
+    return {
+      data: MOCK_BOOKINGS.filter(b => b.profile_id === profileId),
+      error: null, source: 'mock',
+    }
+  }
+  const { data, error } = await supabase
+    .from('seed_bookings')
+    .select('*')
+    .eq('profile_id', profileId)
+    .order('created_at', { ascending: false })
+  if (error) { logSupabaseError('fetchMyBookings', error); return { data: [], error: error.message, source: 'supabase' } }
+  return { data: (data ?? []) as SeedBooking[], error: null, source: 'supabase' }
+}
+
+/** Leader ดึงรายการจองของสมาชิกในกลุ่ม (ต้องมี group_members table หรือ filter ด้วย district) */
+export async function fetchGroupBookings(
+  leaderProfileId: string
+): Promise<DbResult<SeedBooking[]>> {
+  if (!supabase) {
+    return { data: MOCK_BOOKINGS, error: null, source: 'mock' }
+  }
+  // Phase 1: ดึงทั้งหมดให้ leader ดูก่อน (Phase 2 filter ด้วย group)
+  const { data, error } = await supabase
+    .from('seed_bookings')
+    .select(`
+      *,
+      profiles!seed_bookings_profile_id_fkey (
+        full_name, phone, id_card
+      )
+    `)
+    .order('pickup_date', { ascending: true })
+  if (error) { logSupabaseError('fetchGroupBookings', error); return { data: [], error: error.message, source: 'supabase' } }
+  const mapped = (data ?? []).map((row: Record<string, unknown>) => {
+    const p = row.profiles as Record<string, unknown> | null
+    return {
+      ...row,
+      member_name:  String(p?.full_name ?? ''),
+      member_phone: String(p?.phone ?? ''),
+      member_code:  String(p?.id_card ?? ''),
+    } as SeedBooking
+  })
+  return { data: mapped, error: null, source: 'supabase' }
+}
+
+/** Admin ดึงทุก booking */
+export async function fetchAllBookings(): Promise<DbResult<SeedBooking[]>> {
+  if (!supabase) {
+    return { data: MOCK_BOOKINGS, error: null, source: 'mock' }
+  }
+  const { data, error } = await supabase
+    .from('seed_bookings')
+    .select(`*, profiles!seed_bookings_profile_id_fkey(full_name, phone, id_card)`)
+    .order('created_at', { ascending: false })
+  if (error) { logSupabaseError('fetchAllBookings', error); return { data: [], error: error.message, source: 'supabase' } }
+  const mapped = (data ?? []).map((row: Record<string, unknown>) => {
+    const p = row.profiles as Record<string, unknown> | null
+    return { ...row, member_name: String(p?.full_name ?? ''), member_phone: String(p?.phone ?? ''), member_code: String(p?.id_card ?? '') } as SeedBooking
+  })
+  return { data: mapped, error: null, source: 'supabase' }
+}
+
+/** อัปเดตสถานะ booking (confirm / received / cancel) + ตัด stock เมื่อ received */
+export async function updateBookingStatus(
+  bookingId: string,
+  status: BookingStatus,
+  opts?: { pickup_date?: string; admin_note?: string }
+): Promise<DbResult<null>> {
+  if (!supabase) {
+    console.info('[mock] updateBookingStatus', bookingId, status)
+    return { data: null, error: null, source: 'mock' }
+  }
+  const patch: Record<string, unknown> = { status }
+  if (opts?.pickup_date) patch.pickup_date = opts.pickup_date
+  if (opts?.admin_note)  patch.admin_note  = opts.admin_note
+  // ตัด stock เมื่อ received
+  if (status === 'received') patch.stock_deducted = true
+
+  const { error } = await supabase
+    .from('seed_bookings')
+    .update(patch)
+    .eq('id', bookingId)
+  if (error) logSupabaseError('updateBookingStatus', error)
+  return { data: null, error: error?.message ?? null, source: 'supabase' }
+}

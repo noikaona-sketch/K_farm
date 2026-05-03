@@ -23,11 +23,13 @@ import PriceAnnouncement  from './app/farmer/PriceAnnouncement'
 import MemberTier         from './app/farmer/MemberTier'
 import RegisterPage       from './app/farmer/RegisterPage'
 import RegistrationStatus from './app/farmer/RegistrationStatus'
+import SeedBooking      from './app/farmer/SeedBooking'
 import SeedVarieties      from './app/farmer/SeedVarieties'
 
 // Leader
 import LeaderDashboard  from './app/leader/LeaderDashboard'
 import FarmConfirmation from './app/leader/FarmConfirmation'
+import LeaderBookings   from './app/leader/LeaderBookings'
 
 // Inspector
 import InspectorTaskList from './app/inspector/InspectorTaskList'
@@ -145,7 +147,8 @@ export default function App() {
           {/* ── Leader — LINE ── */}
           <Route path="/leader" element={<RequireAuth minRole="leader"><MobileLayout /></RequireAuth>}>
             <Route index          element={<LeaderDashboard />} />
-            <Route path="confirm" element={<FarmConfirmation />} />
+            <Route path="confirm"   element={<FarmConfirmation />} />
+          <Route path="bookings"  element={<LeaderBookings />} />
           </Route>
 
           {/* ── Inspector — LINE ── */}
