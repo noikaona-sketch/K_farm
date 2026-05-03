@@ -116,7 +116,7 @@ export default function AdminLogin() {
           <div>
             <label className="text-xs font-bold text-gray-600 block mb-1.5">รหัสผู้ใช้</label>
             <input value={code} onChange={e => { setCode(e.target.value); setErr(null) }}
-              placeholder="AD001 / LD001 / IN001"
+              placeholder="AD001 / FD001 / LD001 / IN001"
               className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-gray-500 uppercase"
               onKeyDown={e => e.key === 'Enter' && handleLogin()} />
           </div>
