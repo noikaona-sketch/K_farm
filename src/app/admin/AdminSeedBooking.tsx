@@ -65,7 +65,7 @@ export default function AdminSeedBooking() {
   const total = calcCartTotal(cart)
   const totalQty = cart.reduce((sum, item) => sum + Number(item.qty || 0), 0)
   const debt = total
-
+  
   const loadMembers = async (): Promise<PosFarmer[]> => {
     if (!supabase) return MOCK_FARMERS
     const [farmerRes, profileRes] = await Promise.all([
