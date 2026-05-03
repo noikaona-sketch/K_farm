@@ -84,7 +84,7 @@ export default function AdminSeedPOS() {
       if (!isSupabaseReady || !supabase) { setFarmers(MOCK_FARMERS); setLots(MOCK_LOTS); setSales([]); loadBookingToPOS(MOCK_LOTS); return }
       const memberRows = await loadMembers()
       const [varietyRes, supplierRes, lotRes, saleRes] = await Promise.all([
-        supabase.from('seed_varieties').select('id,variety_name,supplier_id,sell_price_per_bag,sell_price,price').order('variety_name'),
+        supabase.from('seed_varieties').select('id,variety_name,supplier_id,sell_price_per_bag,price').order('variety_name'),
         supabase.from('seed_suppliers').select('id,supplier_name'),
         supabase.from('seed_stock_lots').select('id,supplier_id,supplier_name,variety_id,variety_name,lot_no,quantity_balance,created_at,status').gt('quantity_balance', 0).neq('status', 'inactive').order('created_at', { ascending: true }),
         supabase.from('seed_sales').select('*').order('sale_date', { ascending: false }).limit(200),
@@ -98,7 +98,7 @@ export default function AdminSeedPOS() {
       const nextLots = (lotRes.data ?? []).map((r: any) => {
         const v: any = varietyMap.get(String(r.variety_id))
         const supplierId = String(r.supplier_id ?? v?.supplier_id ?? '')
-        const salePrice = Number(v?.sell_price_per_bag ?? v?.sell_price ?? v?.price ?? 0)
+        const salePrice = Number(v?.sell_price_per_bag ?? v?.price ?? 0)
         return { id: String(r.id), supplierId, supplierName: String(r.supplier_name ?? supplierMap.get(supplierId) ?? '-'), varietyId: String(r.variety_id ?? ''), varietyName: String(r.variety_name ?? v?.variety_name ?? '-'), lotNo: String(r.lot_no ?? '-'), balance: Number(r.quantity_balance ?? 0), price: salePrice, createdAt: String(r.created_at ?? '') }
       })
       setLots(nextLots)
