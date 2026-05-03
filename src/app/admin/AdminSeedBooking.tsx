@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { AlertCircle, CalendarCheck, Check, RefreshCw, Wifi, WifiOff } from 'lucide-react'
+import { AlertCircle, CalendarCheck, Check, RefreshCw, ShoppingCart, Wifi, WifiOff } from 'lucide-react'
 import { isSupabaseReady, supabase } from '../../lib/supabase'
 import SeedPOSProductGrid from './SeedPOSProductGrid'
 import SeedPOSCart from './SeedPOSCart'
 import type { PosCartItem, PosFarmer, PosLot, PosPaymentType } from './seedPosTypes'
 import { addDaysDate, fmtMoney, todayDate } from './seedPosTypes'
-import { addLotToCart, calcCartTotal, removeCartItem, updateCartQty } from './seedPosLogic'
+import { addLotToCart, calcCartTotal } from './seedPosLogic'
 
 const MOCK_FARMERS: PosFarmer[] = [
   { id: 'mock-f1', profileId: 'mock-p1', name: 'สมชาย ใจดี', phone: '0812345678', idCard: '1234567890123', district: 'สำโรง' },
@@ -21,8 +21,11 @@ type BookingRow = {
   booking_no: string
   booking_date: string
   receive_date: string
+  farmer_id: string
   farmer_name: string
+  farmer_phone: string
   total_amount: number
+  deposit_amount: number
   status: string
   note?: string
 }
@@ -111,8 +114,11 @@ export default function AdminSeedBooking() {
         booking_no: String(r.booking_no ?? ''),
         booking_date: String(r.booking_date ?? ''),
         receive_date: String(r.receive_date ?? ''),
+        farmer_id: String(r.farmer_id ?? ''),
         farmer_name: String(r.farmer_name ?? '-'),
+        farmer_phone: String(r.farmer_phone ?? ''),
         total_amount: Number(r.total_amount ?? 0),
+        deposit_amount: Number(r.deposit_amount ?? 0),
         status: String(r.status ?? 'pending'),
         note: String(r.note ?? ''),
       })))
@@ -150,7 +156,7 @@ export default function AdminSeedBooking() {
       const bookingNo = genBookingNo()
 
       if (!isSupabaseReady || !supabase) {
-        setBookings((prev) => [{ id: `mock-${Date.now()}`, booking_no: bookingNo, booking_date: bookingDate, receive_date: receiveDate, farmer_name: selectedFarmer.name, total_amount: total, status: 'pending', note }, ...prev])
+        setBookings((prev) => [{ id: `mock-${Date.now()}`, booking_no: bookingNo, booking_date: bookingDate, receive_date: receiveDate, farmer_id: selectedFarmer.id, farmer_name: selectedFarmer.name, farmer_phone: selectedFarmer.phone, total_amount: total, deposit_amount: Number(depositAmount || 0), status: 'pending', note }, ...prev])
         clearBooking()
         setOk(`สร้างใบจอง ${bookingNo} แล้ว`)
         return
@@ -191,6 +197,41 @@ export default function AdminSeedBooking() {
       setOk(`สร้างใบจอง ${bookingNo} แล้ว`)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'จองไม่สำเร็จ')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const convertToPOS = async (booking: BookingRow) => {
+    setSaving(true)
+    setError('')
+    try {
+      if (!isSupabaseReady || !supabase) throw new Error('ต้องเชื่อม Supabase ก่อนแปลงเป็นขาย')
+      const { data, error: itemErr } = await supabase.from('seed_booking_items').select('*').eq('booking_id', booking.id)
+      if (itemErr) throw new Error(itemErr.message)
+      const items = (data ?? []).map((item: any) => ({
+        id: String(item.lot_id ?? ''),
+        supplierName: '',
+        varietyId: String(item.variety_id ?? ''),
+        varietyName: String(item.variety_name ?? '-'),
+        lotNo: String(item.lot_no ?? '-'),
+        balance: Number(item.quantity_balance ?? 0),
+        price: Number(item.sell_price_per_bag ?? 0),
+        qty: Number(item.quantity ?? 0),
+      }))
+      if (items.length === 0) throw new Error('ไม่พบรายการสินค้าในใบจอง')
+      window.localStorage.setItem('seed_booking_to_pos', JSON.stringify({
+        bookingId: booking.id,
+        bookingNo: booking.booking_no,
+        farmerId: booking.farmer_id,
+        farmerName: booking.farmer_name,
+        farmerPhone: booking.farmer_phone,
+        depositAmount: booking.deposit_amount,
+        items,
+      }))
+      window.location.href = '/admin/seed-invoice'
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'แปลงเป็นขายไม่สำเร็จ')
     } finally {
       setSaving(false)
     }
@@ -246,8 +287,8 @@ export default function AdminSeedBooking() {
 
       <div className="bg-white rounded-2xl border overflow-x-auto">
         <table className="w-full text-sm">
-          <thead><tr className="bg-gray-50 text-xs text-gray-500"><th className="text-left p-3">เลขจอง</th><th className="text-left p-3">วันที่จอง</th><th className="text-left p-3">นัดรับ</th><th className="text-left p-3">สมาชิก</th><th className="text-right p-3">ยอดจอง</th><th className="text-center p-3">สถานะ</th><th className="text-left p-3">หมายเหตุ</th></tr></thead>
-          <tbody>{loading ? <tr><td colSpan={7} className="p-6 text-center text-gray-400">กำลังโหลด...</td></tr> : bookings.length === 0 ? <tr><td colSpan={7} className="p-6 text-center text-gray-400">ยังไม่มีรายการจอง</td></tr> : bookings.map((b) => <tr key={b.id} className="border-t"><td className="p-3 font-mono">{b.booking_no}</td><td className="p-3">{b.booking_date}</td><td className="p-3">{b.receive_date}</td><td className="p-3">{b.farmer_name}</td><td className="p-3 text-right">{fmtMoney(b.total_amount)}</td><td className="p-3 text-center">{b.status}</td><td className="p-3">{b.note || '-'}</td></tr>)}</tbody>
+          <thead><tr className="bg-gray-50 text-xs text-gray-500"><th className="text-left p-3">เลขจอง</th><th className="text-left p-3">วันที่จอง</th><th className="text-left p-3">นัดรับ</th><th className="text-left p-3">สมาชิก</th><th className="text-right p-3">ยอดจอง</th><th className="text-center p-3">สถานะ</th><th className="text-left p-3">หมายเหตุ</th><th className="text-center p-3">จัดการ</th></tr></thead>
+          <tbody>{loading ? <tr><td colSpan={8} className="p-6 text-center text-gray-400">กำลังโหลด...</td></tr> : bookings.length === 0 ? <tr><td colSpan={8} className="p-6 text-center text-gray-400">ยังไม่มีรายการจอง</td></tr> : bookings.map((b) => <tr key={b.id} className="border-t"><td className="p-3 font-mono">{b.booking_no}</td><td className="p-3">{b.booking_date}</td><td className="p-3">{b.receive_date}</td><td className="p-3">{b.farmer_name}</td><td className="p-3 text-right">{fmtMoney(b.total_amount)}</td><td className="p-3 text-center">{b.status}</td><td className="p-3">{b.note || '-'}</td><td className="p-3 text-center"><button type="button" disabled={saving || b.status === 'converted'} onClick={() => void convertToPOS(b)} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold disabled:bg-gray-300"><ShoppingCart className="w-3 h-3" />แปลงเป็นขาย</button></td></tr>)}</tbody>
         </table>
       </div>
     </div>
