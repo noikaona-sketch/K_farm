@@ -3,9 +3,11 @@ import { AlertCircle, Check, RefreshCw, Wifi, WifiOff } from 'lucide-react'
 import { isSupabaseReady, supabase } from '../../lib/supabase'
 import SeedPOSProductGrid from './SeedPOSProductGrid'
 import SeedPOSCart from './SeedPOSCart'
+import SeedPOSHistoryActions from './SeedPOSHistoryActions'
 import type { PosCartItem, PosFarmer, PosLot, PosPaymentType, PosSaleRow } from './seedPosTypes'
 import { addDaysDate, todayDate, fmtMoney } from './seedPosTypes'
 import { addLotToCart, calcDeliveryQty, calcPayment, validateCartSale } from './seedPosLogic'
+import { calcDeliverMore, calcPartialReturn } from './seedPosReturnDelivery'
 
 const MOCK_FARMERS: PosFarmer[] = [
   { id: 'mock-f1', profileId: 'mock-p1', name: 'สมชาย ใจดี', phone: '0812345678', idCard: '1234567890123', district: 'สำโรง' },
@@ -50,28 +52,14 @@ export default function AdminSeedPOS() {
       .filter((f: any) => ['approved', 'active', 'farmer', 'member'].includes(String(f.status ?? 'approved')))
       .map((f: any) => {
         const p = profileMap.get(String(f.profile_id ?? ''))
-        return {
-          id: String(f.id),
-          profileId: f.profile_id ? String(f.profile_id) : undefined,
-          name: String(f.full_name ?? p?.full_name ?? f.name ?? '-'),
-          phone: String(f.phone ?? p?.phone ?? ''),
-          idCard: String(f.id_card ?? p?.id_card ?? ''),
-          district: String(f.district ?? ''),
-          village: String(f.village ?? ''),
-        }
+        return { id: String(f.id), profileId: f.profile_id ? String(f.profile_id) : undefined, name: String(f.full_name ?? p?.full_name ?? f.name ?? '-'), phone: String(f.phone ?? p?.phone ?? ''), idCard: String(f.id_card ?? p?.id_card ?? ''), district: String(f.district ?? ''), village: String(f.village ?? '') }
       })
   }
 
   const load = async () => {
-    setLoading(true)
-    setError('')
+    setLoading(true); setError('')
     try {
-      if (!isSupabaseReady || !supabase) {
-        setFarmers(MOCK_FARMERS)
-        setLots(MOCK_LOTS)
-        setSales([])
-        return
-      }
+      if (!isSupabaseReady || !supabase) { setFarmers(MOCK_FARMERS); setLots(MOCK_LOTS); setSales([]); return }
       const memberRows = await loadMembers()
       const [varietyRes, supplierRes, lotRes, saleRes] = await Promise.all([
         supabase.from('seed_varieties').select('id,variety_name,supplier_id').order('variety_name'),
@@ -85,104 +73,83 @@ export default function AdminSeedPOS() {
       const varietyMap = new Map((varietyRes.data ?? []).map((v: any) => [String(v.id), v]))
       const supplierMap = new Map((supplierRes.data ?? []).map((s: any) => [String(s.id), String(s.supplier_name ?? '-')]))
       setFarmers(memberRows)
-      setLots((lotRes.data ?? []).map((r: any) => {
-        const v: any = varietyMap.get(String(r.variety_id))
-        const supplierId = String(r.supplier_id ?? v?.supplier_id ?? '')
-        return {
-          id: String(r.id),
-          supplierId,
-          supplierName: String(r.supplier_name ?? supplierMap.get(supplierId) ?? '-'),
-          varietyId: String(r.variety_id ?? ''),
-          varietyName: String(r.variety_name ?? v?.variety_name ?? '-'),
-          lotNo: String(r.lot_no ?? '-'),
-          balance: Number(r.quantity_balance ?? 0),
-          price: Number(r.sell_price_per_bag ?? 0),
-          createdAt: String(r.created_at ?? ''),
-        }
-      }))
-      setSales((saleRes.data ?? []).map((r: any) => ({
-        id: String(r.id),
-        sale_date: String(r.sale_date ?? ''),
-        farmer_name: String(r.farmer_name ?? '-'),
-        variety_name: String(r.variety_name ?? '-'),
-        lot_no: String(r.lot_no ?? ''),
-        quantity: Number(r.quantity ?? 0),
-        total_amount: Number(r.total_amount ?? 0),
-        paid_amount: Number(r.paid_amount ?? 0),
-        payment_status: String(r.payment_status ?? ''),
-        delivery_status: String(r.delivery_status ?? ''),
-        delivered_quantity: Number(r.delivered_quantity ?? r.quantity ?? 0),
-        pending_delivery_qty: Number(r.pending_delivery_qty ?? 0),
-        returned_quantity: Number(r.returned_quantity ?? 0),
-        return_status: String(r.return_status ?? 'normal'),
-        lot_id: String(r.lot_id ?? ''),
-      })))
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'โหลดข้อมูลไม่สำเร็จ')
-    } finally {
-      setLoading(false)
-    }
+      setLots((lotRes.data ?? []).map((r: any) => { const v: any = varietyMap.get(String(r.variety_id)); const supplierId = String(r.supplier_id ?? v?.supplier_id ?? ''); return { id: String(r.id), supplierId, supplierName: String(r.supplier_name ?? supplierMap.get(supplierId) ?? '-'), varietyId: String(r.variety_id ?? ''), varietyName: String(r.variety_name ?? v?.variety_name ?? '-'), lotNo: String(r.lot_no ?? '-'), balance: Number(r.quantity_balance ?? 0), price: Number(r.sell_price_per_bag ?? 0), createdAt: String(r.created_at ?? '') } }))
+      setSales((saleRes.data ?? []).map((r: any) => ({ id: String(r.id), sale_date: String(r.sale_date ?? ''), farmer_name: String(r.farmer_name ?? '-'), variety_name: String(r.variety_name ?? '-'), lot_no: String(r.lot_no ?? ''), quantity: Number(r.quantity ?? 0), total_amount: Number(r.total_amount ?? 0), paid_amount: Number(r.paid_amount ?? 0), payment_status: String(r.payment_status ?? ''), delivery_status: String(r.delivery_status ?? ''), delivered_quantity: Number(r.delivered_quantity ?? r.quantity ?? 0), pending_delivery_qty: Number(r.pending_delivery_qty ?? 0), returned_quantity: Number(r.returned_quantity ?? 0), return_status: String(r.return_status ?? 'normal'), lot_id: String(r.lot_id ?? '') })))
+    } catch (e) { setError(e instanceof Error ? e.message : 'โหลดข้อมูลไม่สำเร็จ') } finally { setLoading(false) }
   }
 
   useEffect(() => { void load() }, [])
 
   const suppliers = useMemo(() => Array.from(new Map(lots.map((l) => [l.supplierId || '-', l.supplierName || '-'])).entries()).map(([id, name]) => ({ id, name })), [lots])
-  const filteredLots = useMemo(() => {
-    const kw = productSearch.trim().toLowerCase()
-    return lots.filter((l) => (supplierFilter === 'all' || (l.supplierId || '-') === supplierFilter) && (!kw || `${l.varietyName} ${l.lotNo} ${l.supplierName}`.toLowerCase().includes(kw)))
-  }, [lots, supplierFilter, productSearch])
+  const filteredLots = useMemo(() => { const kw = productSearch.trim().toLowerCase(); return lots.filter((l) => (supplierFilter === 'all' || (l.supplierId || '-') === supplierFilter) && (!kw || `${l.varietyName} ${l.lotNo} ${l.supplierName}`.toLowerCase().includes(kw))) }, [lots, supplierFilter, productSearch])
 
-  const clearCart = () => {
-    setCart([])
-    setCashReceived('')
-    setCreditPaid('0')
-    setError('')
-    setOk('')
-  }
+  const clearCart = () => { setCart([]); setCashReceived(''); setCreditPaid('0'); setError(''); setOk('') }
 
   const submitSale = async () => {
-    setSaving(true)
-    setError('')
-    setOk('')
+    setSaving(true); setError(''); setOk('')
     try {
       const validation = validateCartSale({ cart, hasFarmer: !!selectedFarmer, paymentType, cashReceived: Number(cashReceived || 0) })
       if (validation) throw new Error(validation)
       if (!selectedFarmer) throw new Error('กรุณาเลือกสมาชิก')
       if (!isSupabaseReady || !supabase) {
-        setLots((prev) => prev.map((l) => {
-          const c = cart.find((i) => i.id === l.id)
-          if (!c) return l
-          const d = calcDeliveryQty(c)
-          return { ...l, balance: d.nextBalance }
-        }))
-        setSales((prev) => cart.map((i) => {
-          const d = calcDeliveryQty(i)
-          return { id: `mock-sale-${Date.now()}-${i.id}`, sale_date: saleDate, farmer_name: selectedFarmer.name, variety_name: i.varietyName, lot_no: i.lotNo, quantity: i.qty, total_amount: i.qty * i.price, paid_amount: paymentType === 'cash' ? i.qty * i.price : 0, payment_status: paymentType === 'cash' ? 'paid' : 'unpaid', delivery_status: d.deliveryStatus, delivered_quantity: d.deliveredQty, pending_delivery_qty: d.pendingDeliveryQty, returned_quantity: 0, return_status: 'normal', lot_id: i.id }
-        }).concat(prev))
+        setLots((prev) => prev.map((l) => { const c = cart.find((i) => i.id === l.id); if (!c) return l; const d = calcDeliveryQty(c); return { ...l, balance: d.nextBalance } }))
+        setSales((prev) => cart.map((i) => { const d = calcDeliveryQty(i); return { id: `mock-sale-${Date.now()}-${i.id}`, sale_date: saleDate, farmer_name: selectedFarmer.name, variety_name: i.varietyName, lot_no: i.lotNo, quantity: i.qty, total_amount: i.qty * i.price, paid_amount: paymentType === 'cash' ? i.qty * i.price : 0, payment_status: paymentType === 'cash' ? 'paid' : 'unpaid', delivery_status: d.deliveryStatus, delivered_quantity: d.deliveredQty, pending_delivery_qty: d.pendingDeliveryQty, returned_quantity: 0, return_status: 'normal', lot_id: i.id } }).concat(prev))
       } else {
         let remainingCreditPaid = Number(creditPaid || 0)
         for (const item of cart) {
-          const d = calcDeliveryQty(item)
-          const itemTotal = item.qty * item.price
-          const itemPaid = paymentType === 'cash' ? itemTotal : Math.min(remainingCreditPaid, itemTotal)
+          const d = calcDeliveryQty(item); const itemTotal = item.qty * item.price; const itemPaid = paymentType === 'cash' ? itemTotal : Math.min(remainingCreditPaid, itemTotal)
           if (paymentType === 'credit') remainingCreditPaid = Math.max(remainingCreditPaid - itemPaid, 0)
           const itemDebt = Math.max(itemTotal - itemPaid, 0)
           const row = { sale_date: saleDate, farmer_id: selectedFarmer.id, farmer_name: selectedFarmer.name, farmer_phone: selectedFarmer.phone, lot_id: item.id, lot_no: item.lotNo, variety_id: item.varietyId, variety_name: item.varietyName, quantity: item.qty, delivered_quantity: d.deliveredQty, pending_delivery_qty: d.pendingDeliveryQty, sell_price_per_bag: item.price, total_amount: itemTotal, paid_amount: itemPaid, payment_status: itemDebt <= 0 ? 'paid' : itemPaid > 0 ? 'partial' : 'unpaid', delivery_status: d.deliveryStatus, due_date: itemDebt > 0 ? dueDate : null, is_returned: false, refund_amount: 0, returned_quantity: 0, return_status: 'normal' }
-          const { error: saleErr } = await supabase.from('seed_sales').insert(row)
-          if (saleErr) throw new Error(`ขาย ${item.varietyName} ไม่สำเร็จ: ${saleErr.message}`)
-          const { error: stockErr } = await supabase.from('seed_stock_lots').update({ quantity_balance: d.nextBalance, status: d.nextBalance <= 0 ? 'sold_out' : 'available' }).eq('id', item.id)
-          if (stockErr) throw new Error(`ตัด stock ${item.lotNo} ไม่สำเร็จ: ${stockErr.message}`)
+          const { error: saleErr } = await supabase.from('seed_sales').insert(row); if (saleErr) throw new Error(`ขาย ${item.varietyName} ไม่สำเร็จ: ${saleErr.message}`)
+          const { error: stockErr } = await supabase.from('seed_stock_lots').update({ quantity_balance: d.nextBalance, status: d.nextBalance <= 0 ? 'sold_out' : 'available' }).eq('id', item.id); if (stockErr) throw new Error(`ตัด stock ${item.lotNo} ไม่สำเร็จ: ${stockErr.message}`)
         }
         await load()
       }
-      setOk(paymentType === 'cash' ? `ขายสำเร็จ เงินทอน ${fmtMoney(payment.change)} บาท` : `ขายเครดิตสำเร็จ ยอดค้าง ${fmtMoney(payment.debt)} บาท`)
-      clearCart()
-      setSelectedFarmerId('')
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'ขายไม่สำเร็จ')
-    } finally {
-      setSaving(false)
-    }
+      setOk(paymentType === 'cash' ? `ขายสำเร็จ เงินทอน ${fmtMoney(payment.change)} บาท` : `ขายเครดิตสำเร็จ ยอดค้าง ${fmtMoney(payment.debt)} บาท`); clearCart(); setSelectedFarmerId('')
+    } catch (e) { setError(e instanceof Error ? e.message : 'ขายไม่สำเร็จ') } finally { setSaving(false) }
+  }
+
+  const handleDeliverMore = async (sale: PosSaleRow, qty: number) => {
+    setSaving(true); setError(''); setOk('')
+    try {
+      const lot = lots.find((l) => l.id === sale.lot_id)
+      if (!lot) throw new Error('ไม่พบ LOT เดิม')
+      const d = calcDeliverMore(sale, lot, qty)
+      if (d.deliverQty <= 0) throw new Error('จำนวนส่งเพิ่มไม่ถูกต้อง หรือ stock ไม่พอ')
+      if (!isSupabaseReady || !supabase || sale.id.startsWith('mock-')) {
+        setLots((prev) => prev.map((l) => l.id === lot.id ? { ...l, balance: d.nextLotBalance } : l))
+        setSales((prev) => prev.map((s) => s.id === sale.id ? { ...s, delivered_quantity: d.nextDelivered, pending_delivery_qty: d.nextPending, delivery_status: d.nextDeliveryStatus } : s))
+      } else {
+        const { error: saleErr } = await supabase.from('seed_sales').update({ delivered_quantity: d.nextDelivered, pending_delivery_qty: d.nextPending, delivery_status: d.nextDeliveryStatus }).eq('id', sale.id)
+        if (saleErr) throw new Error(saleErr.message)
+        const { error: stockErr } = await supabase.from('seed_stock_lots').update({ quantity_balance: d.nextLotBalance, status: d.nextLotBalance <= 0 ? 'sold_out' : 'available' }).eq('id', lot.id)
+        if (stockErr) throw new Error(stockErr.message)
+        await load()
+      }
+      setOk(`ส่งเพิ่มแล้ว ${d.deliverQty} ถุง`)
+    } catch (e) { setError(e instanceof Error ? e.message : 'ส่งเพิ่มไม่สำเร็จ') } finally { setSaving(false) }
+  }
+
+  const handleReturnPartial = async (sale: PosSaleRow, qty: number) => {
+    setSaving(true); setError(''); setOk('')
+    try {
+      const lot = lots.find((l) => l.id === sale.lot_id)
+      if (!lot) throw new Error('ไม่พบ LOT เดิม')
+      const r = calcPartialReturn(sale, lot, qty)
+      if (r.returnQty <= 0) throw new Error('จำนวนคืนไม่ถูกต้อง')
+      if (!isSupabaseReady || !supabase || sale.id.startsWith('mock-')) {
+        setLots((prev) => prev.map((l) => l.id === lot.id ? { ...l, balance: r.nextLotBalance } : l))
+        setSales((prev) => prev.map((s) => s.id === sale.id ? { ...s, returned_quantity: r.nextReturned, return_status: r.nextReturnStatus } : s))
+      } else {
+        const { error: saleErr } = await supabase.from('seed_sales').update({ returned_quantity: r.nextReturned, return_status: r.nextReturnStatus, returned_at: new Date().toISOString() }).eq('id', sale.id)
+        if (saleErr) throw new Error(saleErr.message)
+        const { error: stockErr } = await supabase.from('seed_stock_lots').update({ quantity_balance: r.nextLotBalance, status: 'available' }).eq('id', lot.id)
+        if (stockErr) throw new Error(stockErr.message)
+        await load()
+      }
+      setOk(`รับคืนแล้ว ${r.returnQty} ถุง`)
+    } catch (e) { setError(e instanceof Error ? e.message : 'รับคืนไม่สำเร็จ') } finally { setSaving(false) }
   }
 
   return (
@@ -191,7 +158,7 @@ export default function AdminSeedPOS() {
       {ok && <div className="rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 text-sm flex gap-2"><Check className="w-4 h-4"/>{ok}</div>}
       {error && <div className="rounded-xl bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-sm flex gap-2"><AlertCircle className="w-4 h-4"/>{error}</div>}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5"><div className="xl:col-span-2"><SeedPOSProductGrid lots={filteredLots} suppliers={suppliers} supplierFilter={supplierFilter} productSearch={productSearch} onSupplierFilterChange={setSupplierFilter} onProductSearchChange={setProductSearch} onAddToCart={(lot) => setCart((prev) => addLotToCart(prev, lot))} /></div><SeedPOSCart cart={cart} farmers={farmers} selectedFarmerId={selectedFarmerId} paymentType={paymentType} cashReceived={cashReceived} creditPaid={creditPaid} dueDate={dueDate} saleDate={saleDate} saving={saving} total={payment.total} change={payment.change} debt={payment.debt} onCartChange={setCart} onFarmerChange={setSelectedFarmerId} onPaymentTypeChange={setPaymentType} onCashReceivedChange={setCashReceived} onCreditPaidChange={setCreditPaid} onDueDateChange={setDueDate} onSaleDateChange={setSaleDate} onClear={clearCart} onSubmit={submitSale} /></div>
-      <div className="bg-white rounded-2xl border overflow-x-auto"><table className="w-full text-sm"><thead><tr className="bg-gray-50 text-xs text-gray-500"><th className="text-left p-3">วันที่</th><th className="text-left p-3">สมาชิก</th><th className="text-left p-3">พันธุ์</th><th className="text-left p-3">Lot</th><th className="text-right p-3">ขาย</th><th className="text-right p-3">ส่งแล้ว</th><th className="text-right p-3">ค้างส่ง</th><th className="text-right p-3">ยอดขาย</th><th className="text-center p-3">สถานะ</th></tr></thead><tbody>{loading ? <tr><td colSpan={9} className="p-6 text-center text-gray-400">กำลังโหลด...</td></tr> : sales.length === 0 ? <tr><td colSpan={9} className="p-6 text-center text-gray-400">ยังไม่มีรายการขาย</td></tr> : sales.map((s) => <tr key={s.id} className="border-t"><td className="p-3">{s.sale_date}</td><td className="p-3">{s.farmer_name}</td><td className="p-3">{s.variety_name}</td><td className="p-3">{s.lot_no}</td><td className="p-3 text-right">{s.quantity}</td><td className="p-3 text-right">{s.delivered_quantity ?? s.quantity}</td><td className="p-3 text-right text-red-600 font-semibold">{s.pending_delivery_qty ?? 0}</td><td className="p-3 text-right">{fmtMoney(s.total_amount)}</td><td className="p-3 text-center">{s.delivery_status === 'partial_pending' ? 'ค้างส่ง' : s.payment_status}</td></tr>)}</tbody></table></div>
+      <div className="bg-white rounded-2xl border overflow-x-auto"><table className="w-full text-sm"><thead><tr className="bg-gray-50 text-xs text-gray-500"><th className="text-left p-3">วันที่</th><th className="text-left p-3">สมาชิก</th><th className="text-left p-3">พันธุ์</th><th className="text-left p-3">Lot</th><th className="text-right p-3">ขาย</th><th className="text-right p-3">ส่งแล้ว</th><th className="text-right p-3">ค้างส่ง</th><th className="text-right p-3">คืนแล้ว</th><th className="text-right p-3">ยอดขาย</th><th className="text-center p-3">จัดการ</th></tr></thead><tbody>{loading ? <tr><td colSpan={10} className="p-6 text-center text-gray-400">กำลังโหลด...</td></tr> : sales.length === 0 ? <tr><td colSpan={10} className="p-6 text-center text-gray-400">ยังไม่มีรายการขาย</td></tr> : sales.map((s) => <tr key={s.id} className="border-t"><td className="p-3">{s.sale_date}</td><td className="p-3">{s.farmer_name}</td><td className="p-3">{s.variety_name}</td><td className="p-3">{s.lot_no}</td><td className="p-3 text-right">{s.quantity}</td><td className="p-3 text-right">{s.delivered_quantity ?? s.quantity}</td><td className="p-3 text-right text-red-600 font-semibold">{s.pending_delivery_qty ?? 0}</td><td className="p-3 text-right text-orange-600 font-semibold">{s.returned_quantity ?? 0}</td><td className="p-3 text-right">{fmtMoney(s.total_amount)}</td><td className="p-3"><SeedPOSHistoryActions sale={s} disabled={saving} onDeliverMore={handleDeliverMore} onReturnPartial={handleReturnPartial} /></td></tr>)}</tbody></table></div>
     </div>
   )
 }
