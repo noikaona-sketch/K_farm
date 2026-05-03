@@ -9,6 +9,7 @@ import AdminRoute   from './routes/AdminRoute'
 import RequirePermission from './routes/RequirePermission'
 import MemberSeedBookingMobile from './app/farmer/MemberSeedBookingMobile'
 import MemberSeedBookingHistory from './app/farmer/MemberSeedBookingHistory'
+import FieldSeedBooking from './app/field/FieldSeedBooking'
 
 // Auth
 import LoginLanding  from './routes/LoginLanding'
@@ -137,16 +138,13 @@ export default function App() {
   />
 
   <Route
-    path="seed-booking"
-    element={
-      <RequirePermission permission="field.seed_booking" fallback="/field">
-        <div className="p-5">
-          <h1 className="text-xl font-bold">จองเมล็ดพันธุ์ภาคสนาม</h1>
-          <p className="text-gray-500 text-sm mt-2">หน้านี้จะเชื่อมกับระบบจองเมล็ดพันธุ์</p>
-        </div>
-      </RequirePermission>
-    }
-  />
+  path="seed-booking"
+  element={
+    <RequirePermission permission="field.seed_booking" fallback="/field">
+      <FieldSeedBooking />
+    </RequirePermission>
+  }
+/>
 
   <Route
     path="farm-inspection"
