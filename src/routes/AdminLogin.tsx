@@ -3,12 +3,48 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, RefreshCw, AlertCircle } from 'lucide-react'
 import { useAuth } from './AuthContext'
 import logoImage from '../assets/logo.png'
+import type { AppRole } from '../lib/roles'
+import type { Department, Permission } from '../lib/permissions'
+
+type StaffAccount = {
+  code: string 
+  password: string
+  name: string
+  role: AppRole
+  department?: Department
+  permissions?: Permission[]
+}
 
 // Mock admin credentials — in production replace with Supabase auth
-const STAFF_ACCOUNTS = [
-  { code: 'AD001', password: 'admin', name: 'ผู้ดูแลระบบ', role: 'admin' as const },
-  { code: 'LD001', password: '5678', name: 'ประสิทธิ์ นำทาง', role: 'leader' as const },
-  { code: 'IN001', password: '9012', name: 'วิภา ตรวจการ', role: 'inspector' as const },
+const STAFF_ACCOUNTS: StaffAccount[] = [
+  {
+    code: 'AD001',
+    password: 'admin',
+    name: 'ผู้ดูแลระบบ',
+    role: 'admin',
+    department: 'it',
+    permissions: ['system.all'],
+  },
+  {
+    code: 'FD001',
+    password: '2222',
+    name: 'เจ้าหน้าที่ภาคสนาม',
+    role: 'field',
+    department: 'agri',
+    permissions: ['field.view', 'field.seed_booking', 'field.farm_inspection', 'field.no_burn'],
+  },
+  {
+    code: 'LD001',
+    password: '5678',
+    name: 'ประสิทธิ์ นำทาง',
+    role: 'leader',
+  },
+  {
+    code: 'IN001',
+    password: '9012',
+    name: 'วิภา ตรวจการ',
+    role: 'inspector',
+  },
 ]
 
 export default function AdminLogin() {
@@ -25,16 +61,19 @@ export default function AdminLogin() {
       const acc = STAFF_ACCOUNTS.find(a => a.code === code.toUpperCase() && a.password === pw)
       if (acc) {
         login({
-          id: acc.code,
-          profileId: acc.code,
-          name: acc.name,
-          role: acc.role,
-          code: acc.code,
-          phone: '',
-          idCard: '',
-          registrationStatus: 'approved',
-        })
+      id: acc.code,
+      profileId: acc.code,
+      name: acc.name,
+      role: acc.role,
+      code: acc.code,
+      phone: '',
+      idCard: '',
+      registrationStatus: 'approved',
+      department: acc.department,
+      permissions: acc.permissions,
+      })
         if (acc.role === 'admin') navigate('/admin', { replace: true })
+        else if (acc.role === 'field') navigate('/field', { replace: true })
         else if (acc.role === 'leader') navigate('/leader', { replace: true })
         else navigate('/inspector', { replace: true })
       } else {
@@ -51,7 +90,7 @@ export default function AdminLogin() {
           <img src={logoImage} className="w-full h-full object-cover" />
         </div>
         <h1 className="text-xl font-bold text-white">ระบบสำหรับเจ้าหน้าที่</h1>
-        <p className="text-gray-400 text-sm mt-0.5">Admin / Leader / Inspector</p>
+        <p className="text-gray-400 text-sm mt-0.5">Admin / Field / Leader / Inspector</p>
       </div>
 
       <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden">
@@ -64,6 +103,7 @@ export default function AdminLogin() {
         <div className="p-6 space-y-4">
           <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-500 space-y-0.5">
             <p>Admin: AD001 / admin</p>
+            <p>Field: FD001 / 2222</p>
             <p>Leader: LD001 / 5678</p>
             <p>Inspector: IN001 / 9012</p>
           </div>
