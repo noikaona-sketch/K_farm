@@ -18,17 +18,18 @@ export type Permission =
   | 'price.view' | 'price.edit'
   | 'inspection.view' | 'inspection.edit'
   | 'service.view' | 'service.edit'
+  | 'field.view' | 'field.seed_booking' | 'field.farm_inspection' | 'field.no_burn' | 'field.member_register' | 'field.machine_check' | 'field.transport_check'
   | 'report.view' | 'report.export'
   | 'system.roles' | 'system.all'
 
 export const DEPT_PERMISSIONS: Record<Department, Permission[]> = {
-  agri: ['member.view', 'member.approve', 'team.view', 'seed.view', 'inspection.view', 'inspection.edit', 'report.view'],
-  sales: ['member.view', 'team.view', 'price.view', 'price.edit', 'seed.view', 'seed.sales', 'seed.debt', 'report.view', 'report.export'],
+  agri: ['member.view', 'member.approve', 'team.view', 'seed.view', 'inspection.view', 'inspection.edit', 'field.view', 'field.seed_booking', 'field.farm_inspection', 'field.no_burn', 'report.view'],
+  sales: ['member.view', 'team.view', 'price.view', 'price.edit', 'seed.view', 'seed.sales', 'seed.debt', 'field.view', 'field.seed_booking', 'report.view', 'report.export'],
   stock: ['seed.view', 'seed.edit', 'seed.stock', 'seed.sales', 'seed.debt', 'service.view', 'report.view'],
-  accounting: ['member.view', 'team.view', 'price.view', 'seed.view', 'seed.debt', 'report.view', 'report.export'],
-  inspection: ['member.view', 'team.view', 'inspection.view', 'inspection.edit', 'report.view'],
-  service: ['service.view', 'service.edit', 'member.view', 'team.view', 'report.view'],
-  it: ['member.view', 'member.approve', 'member.import', 'member.set_role', 'team.view', 'team.edit', 'seed.view', 'seed.edit', 'seed.stock', 'seed.sales', 'seed.debt', 'price.view', 'price.edit', 'inspection.view', 'inspection.edit', 'service.view', 'service.edit', 'report.view', 'report.export', 'system.roles', 'system.all'],
+  accounting: ['member.view', 'team.view', 'price.view', 'seed.view', 'seed.debt', 'field.view', 'field.seed_booking', 'report.view', 'report.export'],
+  inspection: ['member.view', 'team.view', 'inspection.view', 'inspection.edit', 'field.view', 'field.farm_inspection', 'field.no_burn', 'report.view'],
+  service: ['service.view', 'service.edit', 'member.view', 'team.view', 'field.view', 'field.machine_check', 'field.transport_check', 'report.view'],
+  it: ['member.view', 'member.approve', 'member.import', 'member.set_role', 'team.view', 'team.edit', 'seed.view', 'seed.edit', 'seed.stock', 'seed.sales', 'seed.debt', 'price.view', 'price.edit', 'inspection.view', 'inspection.edit', 'service.view', 'service.edit', 'field.view', 'field.seed_booking', 'field.farm_inspection', 'field.no_burn', 'field.member_register', 'field.machine_check', 'field.transport_check', 'report.view', 'report.export', 'system.roles', 'system.all'],
 }
 
 export interface AdminMenuItem {
