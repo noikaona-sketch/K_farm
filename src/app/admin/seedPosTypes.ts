@@ -3,6 +3,7 @@ export type PosFarmer = {
   profileId?: string
   name: string
   phone: string
+  idCard?: string
   district?: string
   village?: string
 }
