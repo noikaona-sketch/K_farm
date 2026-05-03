@@ -366,14 +366,15 @@ export default function AdminSeedBooking() {
             onClear={clearBooking}
             onSubmit={submitBooking}
           />
-          <div className="border rounded-2xl p-3 space-y-2">
-            <div className="flex items-center gap-2 font-semibold text-sm"><MapPin className="w-4 h-4" />จุดรับสินค้า</div>
-            <select value={selectedLocationId} onChange={(e) => { setSelectedLocationId(e.target.value); setSelectedSlotId('') }} className="w-full border rounded-xl p-2 bg-white">
+          <div className="border-2 border-emerald-200 bg-emerald-50 rounded-2xl p-4 space-y-3">
+          <div className="flex items-center gap-2 font-bold text-base text-emerald-800">
+          <MapPin className="w-5 h-5" />จุดนัดรับสินค้า</div>
+            <select value={selectedLocationId} onChange={(e) => { setSelectedLocationId(e.target.value); setSelectedSlotId('') }} className="w-full border-2 border-emerald-300 rounded-xl p-3 bg-white text-base font-medium">
               <option value="">เลือกจุดรับสินค้า</option>
               {pickupLocations.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
             {selectedLocation?.address && <div className="text-xs text-gray-500">{selectedLocation.address}</div>}
-            <select value={selectedSlotId} onChange={(e) => setSelectedSlotId(e.target.value)} className="w-full border rounded-xl p-2 bg-white" disabled={!selectedLocationId}>
+            <select value={selectedSlotId} onChange={(e) => setSelectedSlotId(e.target.value)} className="w-full border-2 border-emerald-300 rounded-xl p-3 bg-white text-base font-medium" disabled={!selectedLocationId}>
               <option value="">เลือกรอบรับสินค้า</option>
               {filteredSlots.map((s) => {
                 const remain = Number(s.capacity_qty || 0) - Number(s.booked_qty || 0)
