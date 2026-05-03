@@ -36,12 +36,12 @@ export type PosSaleRow = {
   total_amount: number
   paid_amount: number
   payment_status: string
-  delivery_status?: string
-  delivered_quantity?: number
-  pending_delivery_qty?: number
-  returned_quantity?: number
-  return_status?: string
-  lot_id?: string
+  delivery_status: string
+  delivered_quantity: number
+  pending_delivery_qty: number
+  returned_quantity: number
+  return_status: string
+  lot_id: string
 }
 
 export function fmtMoney(n: number) {
