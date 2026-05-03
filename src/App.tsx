@@ -58,6 +58,7 @@ import AdminPlaceholderPage  from './app/admin/AdminPlaceholderPage'
 const ROLE_HOME: Record<AppRole, string> = {
   member:    '/farmer',
   farmer:    '/farmer',
+  field:     '/field',
   leader:    '/leader',
   inspector: '/inspector',
   admin:     '/admin',
@@ -83,7 +84,7 @@ function LiffGuard({ children }: { children: React.ReactNode }) {
     if (isInsideLine && user && user.role === 'admin') window.location.href = '/admin'
     if (isInsideLine && !user) return
     if (isInsideLine && user?.role !== 'admin') {
-      if (!window.location.pathname.startsWith('/farmer') && !window.location.pathname.startsWith('/leader') && !window.location.pathname.startsWith('/inspector')) window.location.href = '/farmer'
+      if (!window.location.pathname.startsWith('/farmer') && !window.location.pathname.startsWith('/field') && !window.location.pathname.startsWith('/leader') && !window.location.pathname.startsWith('/inspector')) window.location.href = ROLE_HOME[user?.role ?? 'farmer'] ?? '/farmer'
     }
   }, [user])
   return <>{children}</>
