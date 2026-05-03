@@ -7,6 +7,7 @@ import MobileLayout from './layouts/MobileLayout'
 import AdminLayout  from './layouts/AdminLayout'
 import AdminRoute   from './routes/AdminRoute'
 import MemberSeedBookingMobile from './app/farmer/MemberSeedBookingMobile'
+import MemberSeedBookingHistory from './app/farmer/MemberSeedBookingHistory'
 
 // Auth
 import LoginLanding  from './routes/LoginLanding'
@@ -102,6 +103,7 @@ export default function App() {
         <Route path="register" element={<RegisterPage />} />
         <Route path="seeds" element={<SeedVarieties />} />
         <Route path="seed-booking" element={<MemberSeedBookingMobile />} />
+        <Route path="seed-booking-history" element={<MemberSeedBookingHistory />} />
         <Route path="prices" element={<PriceAnnouncement />} />
         <Route path="tier" element={<MemberTier />} />
         <Route path="pin" element={<RequireAuth minRole="farmer"><PinFarm /></RequireAuth>} />
