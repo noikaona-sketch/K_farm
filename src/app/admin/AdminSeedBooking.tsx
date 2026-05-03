@@ -40,7 +40,6 @@ export default function AdminSeedBooking() {
   const [bookings, setBookings] = useState<BookingRow[]>([])
   const [bookingItems, setBookingItems] = useState<BookingItemRow[]>([])
   const [assignBooking, setAssignBooking] = useState(null)
-  const [bookings, setBookings] = useState<BookingRow[]>([])
   const [pickupLocations, setPickupLocations] = useState<PickupLocation[]>([])
   const [pickupSlots, setPickupSlots] = useState<PickupSlot[]>([])
   const [selectedLocationId, setSelectedLocationId] = useState('')
