@@ -62,9 +62,9 @@ export default function AdminSeedPOS() {
       if (!isSupabaseReady || !supabase) { setFarmers(MOCK_FARMERS); setLots(MOCK_LOTS); setSales([]); return }
       const memberRows = await loadMembers()
       const [varietyRes, supplierRes, lotRes, saleRes] = await Promise.all([
-        supabase.from('seed_varieties').select('id,variety_name,supplier_id').order('variety_name'),
+        supabase.from('seed_varieties').select('id,variety_name,supplier_id,sell_price_per_bag,sell_price,price').order('variety_name'),
         supabase.from('seed_suppliers').select('id,supplier_name'),
-        supabase.from('seed_stock_lots').select('id,supplier_id,supplier_name,variety_id,variety_name,lot_no,quantity_balance,sell_price_per_bag,created_at,status').gt('quantity_balance', 0).neq('status', 'inactive').order('created_at', { ascending: true }),
+        supabase.from('seed_stock_lots').select('id,supplier_id,supplier_name,variety_id,variety_name,lot_no,quantity_balance,created_at,status').gt('quantity_balance', 0).neq('status', 'inactive').order('created_at', { ascending: true }),
         supabase.from('seed_sales').select('*').order('sale_date', { ascending: false }).limit(20),
       ])
       if (varietyRes.error) throw new Error(varietyRes.error.message)
@@ -73,8 +73,13 @@ export default function AdminSeedPOS() {
       const varietyMap = new Map((varietyRes.data ?? []).map((v: any) => [String(v.id), v]))
       const supplierMap = new Map((supplierRes.data ?? []).map((s: any) => [String(s.id), String(s.supplier_name ?? '-')]))
       setFarmers(memberRows)
-      setLots((lotRes.data ?? []).map((r: any) => { const v: any = varietyMap.get(String(r.variety_id)); const supplierId = String(r.supplier_id ?? v?.supplier_id ?? ''); return { id: String(r.id), supplierId, supplierName: String(r.supplier_name ?? supplierMap.get(supplierId) ?? '-'), varietyId: String(r.variety_id ?? ''), varietyName: String(r.variety_name ?? v?.variety_name ?? '-'), lotNo: String(r.lot_no ?? '-'), balance: Number(r.quantity_balance ?? 0), price: Number(r.sell_price_per_bag ?? 0), createdAt: String(r.created_at ?? '') } }))
-      setSales((saleRes.data ?? []).map((r: any) => ({ id: String(r.id), sale_date: String(r.sale_date ?? ''), farmer_name: String(r.farmer_name ?? '-'), variety_name: String(r.variety_name ?? '-'), lot_no: String(r.lot_no ?? ''), quantity: Number(r.quantity ?? 0), total_amount: Number(r.total_amount ?? 0), paid_amount: Number(r.paid_amount ?? 0), payment_status: String(r.payment_status ?? ''), delivery_status: String(r.delivery_status ?? ''), delivered_quantity: Number(r.delivered_quantity ?? r.quantity ?? 0), pending_delivery_qty: Number(r.pending_delivery_qty ?? 0), returned_quantity: Number(r.returned_quantity ?? 0), return_status: String(r.return_status ?? 'normal'), lot_id: String(r.lot_id ?? '') })))
+      setLots((lotRes.data ?? []).map((r: any) => {
+        const v: any = varietyMap.get(String(r.variety_id))
+        const supplierId = String(r.supplier_id ?? v?.supplier_id ?? '')
+        const salePrice = Number(v?.sell_price_per_bag ?? v?.sell_price ?? v?.price ?? 0)
+        return { id: String(r.id), supplierId, supplierName: String(r.supplier_name ?? supplierMap.get(supplierId) ?? '-'), varietyId: String(r.variety_id ?? ''), varietyName: String(r.variety_name ?? v?.variety_name ?? '-'), lotNo: String(r.lot_no ?? '-'), balance: Number(r.quantity_balance ?? 0), price: salePrice, createdAt: String(r.created_at ?? '') }
+      }))
+      setSales((saleRes.data ?? []).map((r: any) => ({ id: String(r.id), sale_date: String(r.sale_date ?? ''), farmer_name: String(r.farmer_name ?? '-'), farmer_phone: String(r.farmer_phone ?? ''), variety_name: String(r.variety_name ?? '-'), lot_no: String(r.lot_no ?? ''), quantity: Number(r.quantity ?? 0), total_amount: Number(r.total_amount ?? 0), paid_amount: Number(r.paid_amount ?? 0), payment_status: String(r.payment_status ?? ''), delivery_status: String(r.delivery_status ?? ''), delivered_quantity: Number(r.delivered_quantity ?? r.quantity ?? 0), pending_delivery_qty: Number(r.pending_delivery_qty ?? 0), returned_quantity: Number(r.returned_quantity ?? 0), return_status: String(r.return_status ?? 'normal'), lot_id: String(r.lot_id ?? ''), invoice_no: String(r.invoice_no ?? ''), seller_name: String(r.seller_name ?? '') })))
     } catch (e) { setError(e instanceof Error ? e.message : 'โหลดข้อมูลไม่สำเร็จ') } finally { setLoading(false) }
   }
 
@@ -93,7 +98,8 @@ export default function AdminSeedPOS() {
       if (!selectedFarmer) throw new Error('กรุณาเลือกสมาชิก')
       if (!isSupabaseReady || !supabase) {
         setLots((prev) => prev.map((l) => { const c = cart.find((i) => i.id === l.id); if (!c) return l; const d = calcDeliveryQty(c); return { ...l, balance: d.nextBalance } }))
-        setSales((prev) => cart.map((i) => { const d = calcDeliveryQty(i); return { id: `mock-sale-${Date.now()}-${i.id}`, sale_date: saleDate, farmer_name: selectedFarmer.name, variety_name: i.varietyName, lot_no: i.lotNo, quantity: i.qty, total_amount: i.qty * i.price, paid_amount: paymentType === 'cash' ? i.qty * i.price : 0, payment_status: paymentType === 'cash' ? 'paid' : 'unpaid', delivery_status: d.deliveryStatus, delivered_quantity: d.deliveredQty, pending_delivery_qty: d.pendingDeliveryQty, returned_quantity: 0, return_status: 'normal', lot_id: i.id } }).concat(prev))
+        const newSales: PosSaleRow[] = cart.map((i) => { const d = calcDeliveryQty(i); return { id: `mock-sale-${Date.now()}-${i.id}`, sale_date: saleDate, farmer_name: selectedFarmer.name, farmer_phone: selectedFarmer.phone, variety_name: i.varietyName, lot_no: i.lotNo, quantity: i.qty, total_amount: i.qty * i.price, paid_amount: paymentType === 'cash' ? i.qty * i.price : 0, payment_status: paymentType === 'cash' ? 'paid' : 'unpaid', delivery_status: d.deliveryStatus, delivered_quantity: d.deliveredQty, pending_delivery_qty: d.pendingDeliveryQty, returned_quantity: 0, return_status: 'normal', lot_id: i.id, invoice_no: '', seller_name: 'Admin' } })
+        setSales((prev) => [...newSales, ...prev])
       } else {
         let remainingCreditPaid = Number(creditPaid || 0)
         for (const item of cart) {
