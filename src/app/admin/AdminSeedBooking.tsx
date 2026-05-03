@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { AlertCircle, CalendarCheck, Check, RefreshCw, ShoppingCart, Wifi, WifiOff } from 'lucide-react'
+import { AlertCircle, CalendarCheck, Check, MapPin, RefreshCw, ShoppingCart, Wifi, WifiOff } from 'lucide-react'
 import { isSupabaseReady, supabase } from '../../lib/supabase'
 import SeedPOSProductGrid from './SeedPOSProductGrid'
 import SeedPOSCart from './SeedPOSCart'
@@ -30,6 +30,22 @@ type BookingRow = {
   note?: string
 }
 
+type PickupLocation = {
+  id: string
+  name: string
+  address?: string
+}
+
+type PickupSlot = {
+  id: string
+  location_id: string
+  pickup_date: string
+  pickup_time: string
+  capacity_qty: number
+  booked_qty: number
+  status: string
+}
+
 function genBookingNo() {
   const d = new Date()
   const y = String(d.getFullYear()).slice(2)
@@ -44,6 +60,10 @@ export default function AdminSeedBooking() {
   const [lots, setLots] = useState<PosLot[]>(MOCK_LOTS)
   const [cart, setCart] = useState<PosCartItem[]>([])
   const [bookings, setBookings] = useState<BookingRow[]>([])
+  const [pickupLocations, setPickupLocations] = useState<PickupLocation[]>([])
+  const [pickupSlots, setPickupSlots] = useState<PickupSlot[]>([])
+  const [selectedLocationId, setSelectedLocationId] = useState('')
+  const [selectedSlotId, setSelectedSlotId] = useState('')
   const [selectedFarmerId, setSelectedFarmerId] = useState('')
   const [supplierFilter, setSupplierFilter] = useState('all')
   const [productSearch, setProductSearch] = useState('')
@@ -57,7 +77,11 @@ export default function AdminSeedBooking() {
   const [error, setError] = useState('')
 
   const selectedFarmer = farmers.find((f) => f.id === selectedFarmerId)
+  const selectedLocation = pickupLocations.find((p) => p.id === selectedLocationId)
+  const filteredSlots = useMemo(() => pickupSlots.filter((s) => s.location_id === selectedLocationId && s.status === 'open'), [pickupSlots, selectedLocationId])
+  const selectedSlot = filteredSlots.find((s) => s.id === selectedSlotId)
   const total = calcCartTotal(cart)
+  const totalQty = cart.reduce((sum, item) => sum + Number(item.qty || 0), 0)
   const debt = Math.max(total - Number(depositAmount || 0), 0)
 
   const loadMembers = async (): Promise<PosFarmer[]> => {
@@ -85,24 +109,32 @@ export default function AdminSeedBooking() {
         setFarmers(MOCK_FARMERS)
         setLots(MOCK_LOTS)
         setBookings([])
+        setPickupLocations([{ id: 'mock-pickup-1', name: 'โรงงานหลัก', address: 'สำโรง' }])
+        setPickupSlots([{ id: 'mock-slot-1', location_id: 'mock-pickup-1', pickup_date: addDaysDate(7), pickup_time: '09:00-12:00', capacity_qty: 500, booked_qty: 0, status: 'open' }])
         return
       }
 
       const memberRows = await loadMembers()
-      const [varietyRes, supplierRes, lotRes, bookingRes] = await Promise.all([
+      const [varietyRes, supplierRes, lotRes, bookingRes, locationRes, slotRes] = await Promise.all([
         supabase.from('seed_varieties').select('id,variety_name,supplier_id,sell_price_per_bag,sell_price,price').order('variety_name'),
         supabase.from('seed_suppliers').select('id,supplier_name'),
         supabase.from('seed_stock_lots').select('id,supplier_id,supplier_name,variety_id,variety_name,lot_no,quantity_balance,created_at,status').gt('quantity_balance', 0).neq('status', 'inactive').order('created_at', { ascending: true }),
         supabase.from('seed_bookings').select('*').order('booking_date', { ascending: false }).limit(50),
+        supabase.from('pickup_locations').select('id,name,address,active').eq('active', true).order('name'),
+        supabase.from('pickup_slots').select('id,location_id,pickup_date,pickup_time,capacity_qty,booked_qty,status').in('status', ['open', 'full']).order('pickup_date', { ascending: true }),
       ])
       if (varietyRes.error) throw new Error(varietyRes.error.message)
       if (lotRes.error) throw new Error(lotRes.error.message)
       if (bookingRes.error) throw new Error(bookingRes.error.message)
+      if (locationRes.error) throw new Error(locationRes.error.message)
+      if (slotRes.error) throw new Error(slotRes.error.message)
 
       const varietyMap = new Map((varietyRes.data ?? []).map((v: any) => [String(v.id), v]))
       const supplierMap = new Map((supplierRes.data ?? []).map((s: any) => [String(s.id), String(s.supplier_name ?? '-')]))
 
       setFarmers(memberRows)
+      setPickupLocations((locationRes.data ?? []).map((r: any) => ({ id: String(r.id), name: String(r.name ?? '-'), address: String(r.address ?? '') })))
+      setPickupSlots((slotRes.data ?? []).map((r: any) => ({ id: String(r.id), location_id: String(r.location_id ?? ''), pickup_date: String(r.pickup_date ?? ''), pickup_time: String(r.pickup_time ?? ''), capacity_qty: Number(r.capacity_qty ?? 0), booked_qty: Number(r.booked_qty ?? 0), status: String(r.status ?? 'open') })))
       setLots((lotRes.data ?? []).map((r: any) => {
         const v: any = varietyMap.get(String(r.variety_id))
         const supplierId = String(r.supplier_id ?? v?.supplier_id ?? '')
@@ -113,7 +145,7 @@ export default function AdminSeedBooking() {
         id: String(r.id),
         booking_no: String(r.booking_no ?? ''),
         booking_date: String(r.booking_date ?? ''),
-        receive_date: String(r.receive_date ?? ''),
+        receive_date: String(r.receive_date ?? r.pickup_date ?? ''),
         farmer_id: String(r.farmer_id ?? ''),
         farmer_name: String(r.farmer_name ?? '-'),
         farmer_phone: String(r.farmer_phone ?? ''),
@@ -130,6 +162,18 @@ export default function AdminSeedBooking() {
   }
 
   useEffect(() => { void load() }, [])
+
+  useEffect(() => {
+    if (filteredSlots.length === 0) {
+      setSelectedSlotId('')
+      return
+    }
+    if (!filteredSlots.some((s) => s.id === selectedSlotId)) setSelectedSlotId(filteredSlots[0].id)
+  }, [filteredSlots, selectedSlotId])
+
+  useEffect(() => {
+    if (selectedSlot?.pickup_date) setReceiveDate(selectedSlot.pickup_date)
+  }, [selectedSlot])
 
   const suppliers = useMemo(() => Array.from(new Map(lots.map((l) => [l.supplierId || '-', l.supplierName || '-'])).entries()).map(([id, name]) => ({ id, name })), [lots])
   const filteredLots = useMemo(() => {
@@ -153,6 +197,10 @@ export default function AdminSeedBooking() {
     try {
       if (!selectedFarmer) throw new Error('กรุณาเลือกสมาชิก')
       if (cart.length === 0) throw new Error('กรุณาเลือกสินค้า')
+      if (!selectedLocation) throw new Error('กรุณาเลือกจุดรับสินค้า')
+      if (!selectedSlot) throw new Error('กรุณาเลือกรอบรับสินค้า')
+      const remainingSlotQty = Number(selectedSlot.capacity_qty || 0) - Number(selectedSlot.booked_qty || 0)
+      if (totalQty > remainingSlotQty) throw new Error(`รอบรับนี้เหลือรับได้ ${remainingSlotQty} ถุง`)
       const bookingNo = genBookingNo()
 
       if (!isSupabaseReady || !supabase) {
@@ -173,6 +221,12 @@ export default function AdminSeedBooking() {
         deposit_amount: Number(depositAmount || 0),
         balance_amount: debt,
         status: 'pending',
+        payment_status: 'unpaid',
+        pickup_location_id: selectedLocation.id,
+        pickup_slot_id: selectedSlot.id,
+        pickup_location_name: selectedLocation.name,
+        pickup_date: selectedSlot.pickup_date,
+        pickup_time: selectedSlot.pickup_time,
         note,
       }).select('id').single()
       if (bookingErr) throw new Error(bookingErr.message)
@@ -191,6 +245,10 @@ export default function AdminSeedBooking() {
       }))
       const { error: itemErr } = await supabase.from('seed_booking_items').insert(items)
       if (itemErr) throw new Error(itemErr.message)
+
+      const nextBookedQty = Number(selectedSlot.booked_qty || 0) + totalQty
+      const { error: slotErr } = await supabase.from('pickup_slots').update({ booked_qty: nextBookedQty, status: nextBookedQty >= Number(selectedSlot.capacity_qty || 0) ? 'full' : selectedSlot.status }).eq('id', selectedSlot.id)
+      if (slotErr) throw new Error(slotErr.message)
 
       await load()
       clearBooking()
@@ -220,6 +278,8 @@ export default function AdminSeedBooking() {
         qty: Number(item.quantity ?? 0),
       }))
       if (items.length === 0) throw new Error('ไม่พบรายการสินค้าในใบจอง')
+      const { error: updateErr } = await supabase.from('seed_bookings').update({ status: 'converted' }).eq('id', booking.id).neq('status', 'converted')
+      if (updateErr) throw new Error(updateErr.message)
       window.localStorage.setItem('seed_booking_to_pos', JSON.stringify({
         bookingId: booking.id,
         bookingNo: booking.booking_no,
@@ -261,6 +321,7 @@ export default function AdminSeedBooking() {
           <SeedPOSCart
             cart={cart}
             farmers={farmers}
+            availableLots={lots}
             selectedFarmerId={selectedFarmerId}
             paymentType={'credit' as PaymentTypeShim}
             cashReceived="0"
@@ -281,6 +342,21 @@ export default function AdminSeedBooking() {
             onClear={clearBooking}
             onSubmit={submitBooking}
           />
+          <div className="border rounded-2xl p-3 space-y-2">
+            <div className="flex items-center gap-2 font-semibold text-sm"><MapPin className="w-4 h-4" />จุดรับสินค้า</div>
+            <select value={selectedLocationId} onChange={(e) => { setSelectedLocationId(e.target.value); setSelectedSlotId('') }} className="w-full border rounded-xl p-2 bg-white">
+              <option value="">เลือกจุดรับสินค้า</option>
+              {pickupLocations.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+            {selectedLocation?.address && <div className="text-xs text-gray-500">{selectedLocation.address}</div>}
+            <select value={selectedSlotId} onChange={(e) => setSelectedSlotId(e.target.value)} className="w-full border rounded-xl p-2 bg-white" disabled={!selectedLocationId}>
+              <option value="">เลือกรอบรับสินค้า</option>
+              {filteredSlots.map((s) => {
+                const remain = Number(s.capacity_qty || 0) - Number(s.booked_qty || 0)
+                return <option key={s.id} value={s.id}>{s.pickup_date} {s.pickup_time || ''} | เหลือ {fmtMoney(remain)} ถุง</option>
+              })}
+            </select>
+          </div>
           <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="หมายเหตุการจอง" className="w-full border rounded-xl p-2 min-h-[80px]" />
         </div>
       </div>
