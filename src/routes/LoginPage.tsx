@@ -13,7 +13,12 @@ const MOCK_USERS = [
 ]
 
 const ROLE_HOME: Record<AppRole, string> = {
-  member:'/farmer', farmer:'/farmer', leader:'/leader', inspector:'/inspector', admin:'/admin'
+  member:'/farmer',
+  farmer:'/farmer',
+  field:'/field',   // 👈 เพิ่มบรรทัดนี้
+  leader:'/leader',
+  inspector:'/inspector',
+  admin:'/admin'
 }
 
 const ROLES = [
