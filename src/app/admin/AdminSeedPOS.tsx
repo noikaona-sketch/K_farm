@@ -5,7 +5,7 @@ import SeedPOSProductGrid from './SeedPOSProductGrid'
 import SeedPOSCart from './SeedPOSCart'
 import type { PosCartItem, PosFarmer, PosLot, PosPaymentType, PosSaleRow } from './seedPosTypes'
 import { addDaysDate, todayDate, fmtMoney } from './seedPosTypes'
-import { addLotToCart, calcPayment, validateCartSale } from './seedPosLogic'
+import { addLotToCart, calcDeliveryQty, calcPayment, validateCartSale } from './seedPosLogic'
 
 const MOCK_FARMERS: PosFarmer[] = [
   { id: 'mock-f1', profileId: 'mock-p1', name: 'สมชาย ใจดี', phone: '0812345678', idCard: '1234567890123', district: 'สำโรง' },
@@ -82,10 +82,8 @@ export default function AdminSeedPOS() {
       if (varietyRes.error) throw new Error(varietyRes.error.message)
       if (lotRes.error) throw new Error(lotRes.error.message)
       if (saleRes.error) throw new Error(saleRes.error.message)
-
       const varietyMap = new Map((varietyRes.data ?? []).map((v: any) => [String(v.id), v]))
       const supplierMap = new Map((supplierRes.data ?? []).map((s: any) => [String(s.id), String(s.supplier_name ?? '-')]))
-
       setFarmers(memberRows)
       setLots((lotRes.data ?? []).map((r: any) => {
         const v: any = varietyMap.get(String(r.variety_id))
@@ -112,6 +110,12 @@ export default function AdminSeedPOS() {
         total_amount: Number(r.total_amount ?? 0),
         paid_amount: Number(r.paid_amount ?? 0),
         payment_status: String(r.payment_status ?? ''),
+        delivery_status: String(r.delivery_status ?? ''),
+        delivered_quantity: Number(r.delivered_quantity ?? r.quantity ?? 0),
+        pending_delivery_qty: Number(r.pending_delivery_qty ?? 0),
+        returned_quantity: Number(r.returned_quantity ?? 0),
+        return_status: String(r.return_status ?? 'normal'),
+        lot_id: String(r.lot_id ?? ''),
       })))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'โหลดข้อมูลไม่สำเร็จ')
@@ -125,10 +129,7 @@ export default function AdminSeedPOS() {
   const suppliers = useMemo(() => Array.from(new Map(lots.map((l) => [l.supplierId || '-', l.supplierName || '-'])).entries()).map(([id, name]) => ({ id, name })), [lots])
   const filteredLots = useMemo(() => {
     const kw = productSearch.trim().toLowerCase()
-    return lots.filter((l) =>
-      (supplierFilter === 'all' || (l.supplierId || '-') === supplierFilter) &&
-      (!kw || `${l.varietyName} ${l.lotNo} ${l.supplierName}`.toLowerCase().includes(kw))
-    )
+    return lots.filter((l) => (supplierFilter === 'all' || (l.supplierId || '-') === supplierFilter) && (!kw || `${l.varietyName} ${l.lotNo} ${l.supplierName}`.toLowerCase().includes(kw)))
   }, [lots, supplierFilter, productSearch])
 
   const clearCart = () => {
@@ -147,52 +148,29 @@ export default function AdminSeedPOS() {
       const validation = validateCartSale({ cart, hasFarmer: !!selectedFarmer, paymentType, cashReceived: Number(cashReceived || 0) })
       if (validation) throw new Error(validation)
       if (!selectedFarmer) throw new Error('กรุณาเลือกสมาชิก')
-
       if (!isSupabaseReady || !supabase) {
         setLots((prev) => prev.map((l) => {
           const c = cart.find((i) => i.id === l.id)
-          return c ? { ...l, balance: l.balance - c.qty } : l
+          if (!c) return l
+          const d = calcDeliveryQty(c)
+          return { ...l, balance: d.nextBalance }
         }))
-        setSales((prev) => cart.map((i) => ({
-          id: `mock-sale-${Date.now()}-${i.id}`,
-          sale_date: saleDate,
-          farmer_name: selectedFarmer.name,
-          variety_name: i.varietyName,
-          lot_no: i.lotNo,
-          quantity: i.qty,
-          total_amount: i.qty * i.price,
-          paid_amount: paymentType === 'cash' ? i.qty * i.price : 0,
-          payment_status: paymentType === 'cash' ? 'paid' : 'unpaid',
-        })).concat(prev))
+        setSales((prev) => cart.map((i) => {
+          const d = calcDeliveryQty(i)
+          return { id: `mock-sale-${Date.now()}-${i.id}`, sale_date: saleDate, farmer_name: selectedFarmer.name, variety_name: i.varietyName, lot_no: i.lotNo, quantity: i.qty, total_amount: i.qty * i.price, paid_amount: paymentType === 'cash' ? i.qty * i.price : 0, payment_status: paymentType === 'cash' ? 'paid' : 'unpaid', delivery_status: d.deliveryStatus, delivered_quantity: d.deliveredQty, pending_delivery_qty: d.pendingDeliveryQty, returned_quantity: 0, return_status: 'normal', lot_id: i.id }
+        }).concat(prev))
       } else {
         let remainingCreditPaid = Number(creditPaid || 0)
         for (const item of cart) {
+          const d = calcDeliveryQty(item)
           const itemTotal = item.qty * item.price
           const itemPaid = paymentType === 'cash' ? itemTotal : Math.min(remainingCreditPaid, itemTotal)
           if (paymentType === 'credit') remainingCreditPaid = Math.max(remainingCreditPaid - itemPaid, 0)
           const itemDebt = Math.max(itemTotal - itemPaid, 0)
-          const row = {
-            sale_date: saleDate,
-            farmer_id: selectedFarmer.id,
-            farmer_name: selectedFarmer.name,
-            farmer_phone: selectedFarmer.phone,
-            lot_id: item.id,
-            lot_no: item.lotNo,
-            variety_id: item.varietyId,
-            variety_name: item.varietyName,
-            quantity: item.qty,
-            sell_price_per_bag: item.price,
-            total_amount: itemTotal,
-            paid_amount: itemPaid,
-            payment_status: itemDebt <= 0 ? 'paid' : itemPaid > 0 ? 'partial' : 'unpaid',
-            delivery_status: 'delivered',
-            due_date: itemDebt > 0 ? dueDate : null,
-            is_returned: false,
-            refund_amount: 0,
-          }
+          const row = { sale_date: saleDate, farmer_id: selectedFarmer.id, farmer_name: selectedFarmer.name, farmer_phone: selectedFarmer.phone, lot_id: item.id, lot_no: item.lotNo, variety_id: item.varietyId, variety_name: item.varietyName, quantity: item.qty, delivered_quantity: d.deliveredQty, pending_delivery_qty: d.pendingDeliveryQty, sell_price_per_bag: item.price, total_amount: itemTotal, paid_amount: itemPaid, payment_status: itemDebt <= 0 ? 'paid' : itemPaid > 0 ? 'partial' : 'unpaid', delivery_status: d.deliveryStatus, due_date: itemDebt > 0 ? dueDate : null, is_returned: false, refund_amount: 0, returned_quantity: 0, return_status: 'normal' }
           const { error: saleErr } = await supabase.from('seed_sales').insert(row)
           if (saleErr) throw new Error(`ขาย ${item.varietyName} ไม่สำเร็จ: ${saleErr.message}`)
-          const { error: stockErr } = await supabase.from('seed_stock_lots').update({ quantity_balance: item.balance - item.qty, status: item.balance - item.qty <= 0 ? 'sold_out' : 'available' }).eq('id', item.id)
+          const { error: stockErr } = await supabase.from('seed_stock_lots').update({ quantity_balance: d.nextBalance, status: d.nextBalance <= 0 ? 'sold_out' : 'available' }).eq('id', item.id)
           if (stockErr) throw new Error(`ตัด stock ${item.lotNo} ไม่สำเร็จ: ${stockErr.message}`)
         }
         await load()
@@ -209,34 +187,11 @@ export default function AdminSeedPOS() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">POS ขายเมล็ดพันธุ์</h1>
-          <div className="flex items-center gap-1.5 mt-0.5 text-sm">
-            {isSupabaseReady ? <><Wifi className="w-3.5 h-3.5 text-emerald-600"/><span className="text-emerald-600">Cash + Credit + Cart</span></> : <><WifiOff className="w-3.5 h-3.5 text-amber-500"/><span className="text-amber-600">Mock data</span></>}
-          </div>
-        </div>
-        <button onClick={() => void load()} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm">
-          <RefreshCw className="w-4 h-4"/>รีโหลด
-        </button>
-      </div>
-
+      <div className="flex items-center justify-between flex-wrap gap-3"><div><h1 className="text-xl font-bold text-gray-900">POS ขายเมล็ดพันธุ์</h1><div className="flex items-center gap-1.5 mt-0.5 text-sm">{isSupabaseReady ? <><Wifi className="w-3.5 h-3.5 text-emerald-600"/><span className="text-emerald-600">Cash + Credit + Cart</span></> : <><WifiOff className="w-3.5 h-3.5 text-amber-500"/><span className="text-amber-600">Mock data</span></>}</div></div><button onClick={() => void load()} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm"><RefreshCw className="w-4 h-4"/>รีโหลด</button></div>
       {ok && <div className="rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 text-sm flex gap-2"><Check className="w-4 h-4"/>{ok}</div>}
       {error && <div className="rounded-xl bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-sm flex gap-2"><AlertCircle className="w-4 h-4"/>{error}</div>}
-
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-        <div className="xl:col-span-2">
-          <SeedPOSProductGrid lots={filteredLots} suppliers={suppliers} supplierFilter={supplierFilter} productSearch={productSearch} onSupplierFilterChange={setSupplierFilter} onProductSearchChange={setProductSearch} onAddToCart={(lot) => setCart((prev) => addLotToCart(prev, lot))} />
-        </div>
-        <SeedPOSCart cart={cart} farmers={farmers} selectedFarmerId={selectedFarmerId} paymentType={paymentType} cashReceived={cashReceived} creditPaid={creditPaid} dueDate={dueDate} saleDate={saleDate} saving={saving} total={payment.total} change={payment.change} debt={payment.debt} onCartChange={setCart} onFarmerChange={setSelectedFarmerId} onPaymentTypeChange={setPaymentType} onCashReceivedChange={setCashReceived} onCreditPaidChange={setCreditPaid} onDueDateChange={setDueDate} onSaleDateChange={setSaleDate} onClear={clearCart} onSubmit={submitSale} />
-      </div>
-
-      <div className="bg-white rounded-2xl border overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead><tr className="bg-gray-50 text-xs text-gray-500"><th className="text-left p-3">วันที่</th><th className="text-left p-3">สมาชิก</th><th className="text-left p-3">พันธุ์</th><th className="text-left p-3">Lot</th><th className="text-right p-3">จำนวน</th><th className="text-right p-3">ยอดขาย</th><th className="text-right p-3">ชำระ</th><th className="text-center p-3">สถานะ</th></tr></thead>
-          <tbody>{loading ? <tr><td colSpan={8} className="p-6 text-center text-gray-400">กำลังโหลด...</td></tr> : sales.length === 0 ? <tr><td colSpan={8} className="p-6 text-center text-gray-400">ยังไม่มีรายการขาย</td></tr> : sales.map((s) => <tr key={s.id} className="border-t"><td className="p-3">{s.sale_date}</td><td className="p-3">{s.farmer_name}</td><td className="p-3">{s.variety_name}</td><td className="p-3">{s.lot_no}</td><td className="p-3 text-right">{s.quantity}</td><td className="p-3 text-right">{fmtMoney(s.total_amount)}</td><td className="p-3 text-right">{fmtMoney(s.paid_amount)}</td><td className="p-3 text-center">{s.payment_status}</td></tr>)}</tbody>
-        </table>
-      </div>
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5"><div className="xl:col-span-2"><SeedPOSProductGrid lots={filteredLots} suppliers={suppliers} supplierFilter={supplierFilter} productSearch={productSearch} onSupplierFilterChange={setSupplierFilter} onProductSearchChange={setProductSearch} onAddToCart={(lot) => setCart((prev) => addLotToCart(prev, lot))} /></div><SeedPOSCart cart={cart} farmers={farmers} selectedFarmerId={selectedFarmerId} paymentType={paymentType} cashReceived={cashReceived} creditPaid={creditPaid} dueDate={dueDate} saleDate={saleDate} saving={saving} total={payment.total} change={payment.change} debt={payment.debt} onCartChange={setCart} onFarmerChange={setSelectedFarmerId} onPaymentTypeChange={setPaymentType} onCashReceivedChange={setCashReceived} onCreditPaidChange={setCreditPaid} onDueDateChange={setDueDate} onSaleDateChange={setSaleDate} onClear={clearCart} onSubmit={submitSale} /></div>
+      <div className="bg-white rounded-2xl border overflow-x-auto"><table className="w-full text-sm"><thead><tr className="bg-gray-50 text-xs text-gray-500"><th className="text-left p-3">วันที่</th><th className="text-left p-3">สมาชิก</th><th className="text-left p-3">พันธุ์</th><th className="text-left p-3">Lot</th><th className="text-right p-3">ขาย</th><th className="text-right p-3">ส่งแล้ว</th><th className="text-right p-3">ค้างส่ง</th><th className="text-right p-3">ยอดขาย</th><th className="text-center p-3">สถานะ</th></tr></thead><tbody>{loading ? <tr><td colSpan={9} className="p-6 text-center text-gray-400">กำลังโหลด...</td></tr> : sales.length === 0 ? <tr><td colSpan={9} className="p-6 text-center text-gray-400">ยังไม่มีรายการขาย</td></tr> : sales.map((s) => <tr key={s.id} className="border-t"><td className="p-3">{s.sale_date}</td><td className="p-3">{s.farmer_name}</td><td className="p-3">{s.variety_name}</td><td className="p-3">{s.lot_no}</td><td className="p-3 text-right">{s.quantity}</td><td className="p-3 text-right">{s.delivered_quantity ?? s.quantity}</td><td className="p-3 text-right text-red-600 font-semibold">{s.pending_delivery_qty ?? 0}</td><td className="p-3 text-right">{fmtMoney(s.total_amount)}</td><td className="p-3 text-center">{s.delivery_status === 'partial_pending' ? 'ค้างส่ง' : s.payment_status}</td></tr>)}</tbody></table></div>
     </div>
   )
 }
