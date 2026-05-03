@@ -7,11 +7,31 @@ import logoImage from '../assets/logo.png'
 const MOCK_USERS = [
   { id:'f1', name:'สมชาย ใจดี',        role:'farmer'    as AppRole, code:'KF001', phone:'0812345678', password:'1234' },
   { id:'f2', name:'สมหญิง รักษ์ไทย',   role:'farmer'    as AppRole, code:'KF002', phone:'0898765432', password:'1234' },
+
+  // ✅ เพิ่มทีมภาคสนาม
+  {id:'fd1',name:'เจ้าหน้าที่ภาคสนาม',   role:'field' as AppRole,  code:'FD001', phone:'0833331111', password:'2222',department:'agri', permissions:[
+      'field.view',
+      'field.seed_booking',
+      'field.farm_inspection',
+      'field.no_burn',
+    ],
+  },
+
   { id:'l1', name:'ประสิทธิ์ นำทาง',   role:'leader'    as AppRole, code:'LD001', phone:'0844441111', password:'5678' },
   { id:'i1', name:'วิภา ตรวจการ',       role:'inspector' as AppRole, code:'IN001', phone:'0855552222', password:'9012' },
-  { id:'a1', name:'ผู้ดูแลระบบ',         role:'admin'     as AppRole, code:'AD001', phone:'0866663333', password:'admin' },
-]
 
+  // แนะนำเพิ่ม permissions ให้ admin ด้วย
+  {
+    id:'a1',
+    name:'ผู้ดูแลระบบ',
+    role:'admin' as AppRole,
+    code:'AD001',
+    phone:'0866663333',
+    password:'admin',
+    department:'it',
+    permissions:['system.all'],
+  },
+]
 const ROLE_HOME: Record<AppRole, string> = {
   member:'/farmer',
   farmer:'/farmer',
@@ -25,11 +45,12 @@ const ROLES = [
   { key:'farmer'    as AppRole, icon:'🌾', label:'เกษตรกร',              desc:'บันทึกการปลูก ขาย และสิทธิ์ต่างๆ',      hint:'KF001 / 1234' },
   { key:'leader'    as AppRole, icon:'👑', label:'หัวหน้ากลุ่ม',          desc:'ยืนยันแปลงและดูแลสมาชิกกลุ่ม',           hint:'LD001 / 5678' },
   { key:'inspector' as AppRole, icon:'🔍', label:'เจ้าหน้าที่ตรวจสอบ',    desc:'ตรวจสอบแปลงและออกผลการรับรอง',           hint:'IN001 / 9012' },
+  { key:'field'     as AppRole,  icon:'📋',  label:'ทีมภาคสนาม',   desc:'จองเมล็ด ตรวจแปลง และตรวจไม่เผา',  hint:'FD001 / 2222'},
   { key:'admin'     as AppRole, icon:'⚙️', label:'ผู้ดูแลระบบ (โรงงาน)', desc:'บริหารจัดการราคาและข้อมูลทั้งหมด',        hint:'AD001 / admin' },
 ]
 
 const BG: Record<AppRole, string> = {
-  member:'bg-emerald-600', farmer:'bg-emerald-600', leader:'bg-amber-500', inspector:'bg-blue-600', admin:'bg-purple-700'
+  member:'bg-emerald-600', farmer:'bg-emerald-600', field:'bg-teal-600',leader:'bg-amber-500', inspector:'bg-blue-600', admin:'bg-purple-700'
 }
 
 export default function LoginPage() {
