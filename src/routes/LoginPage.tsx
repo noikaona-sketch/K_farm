@@ -1,30 +1,40 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth, type AppRole } from './AuthContext'
+import type { Department, Permission } from '../lib/permissions'
 import { RefreshCw, AlertCircle } from 'lucide-react'
 import logoImage from '../assets/logo.png'
 
-const MOCK_USERS = [
-  { id:'f1', name:'สมชาย ใจดี',        role:'farmer'    as AppRole, code:'KF001', phone:'0812345678', password:'1234' },
-  { id:'f2', name:'สมหญิง รักษ์ไทย',   role:'farmer'    as AppRole, code:'KF002', phone:'0898765432', password:'1234' },
+type MockUser = {
+  id: string
+  name: string
+  role: AppRole
+  code: string
+  phone: string
+  password: string
+  department?: Department
+  permissions?: Permission[]
+}
 
-  // ✅ เพิ่มทีมภาคสนาม
-  {id:'fd1',name:'เจ้าหน้าที่ภาคสนาม',   role:'field' as AppRole,  code:'FD001', phone:'0833331111', password:'2222',department:'agri', permissions:[
-      'field.view',
-      'field.seed_booking',
-      'field.farm_inspection',
-      'field.no_burn',
-    ],
+const MOCK_USERS: MockUser[] = [
+  { id:'f1', name:'สมชาย ใจดี', role:'farmer', code:'KF001', phone:'0812345678', password:'1234' },
+  { id:'f2', name:'สมหญิง รักษ์ไทย', role:'farmer', code:'KF002', phone:'0898765432', password:'1234' },
+  {
+    id:'fd1',
+    name:'เจ้าหน้าที่ภาคสนาม',
+    role:'field',
+    code:'FD001',
+    phone:'0833331111',
+    password:'2222',
+    department:'agri',
+    permissions:['field.view', 'field.seed_booking', 'field.farm_inspection', 'field.no_burn'],
   },
-
-  { id:'l1', name:'ประสิทธิ์ นำทาง',   role:'leader'    as AppRole, code:'LD001', phone:'0844441111', password:'5678' },
-  { id:'i1', name:'วิภา ตรวจการ',       role:'inspector' as AppRole, code:'IN001', phone:'0855552222', password:'9012' },
-
-  // แนะนำเพิ่ม permissions ให้ admin ด้วย
+  { id:'l1', name:'ประสิทธิ์ นำทาง', role:'leader', code:'LD001', phone:'0844441111', password:'5678' },
+  { id:'i1', name:'วิภา ตรวจการ', role:'inspector', code:'IN001', phone:'0855552222', password:'9012' },
   {
     id:'a1',
     name:'ผู้ดูแลระบบ',
-    role:'admin' as AppRole,
+    role:'admin',
     code:'AD001',
     phone:'0866663333',
     password:'admin',
@@ -32,25 +42,31 @@ const MOCK_USERS = [
     permissions:['system.all'],
   },
 ]
+
 const ROLE_HOME: Record<AppRole, string> = {
   member:'/farmer',
   farmer:'/farmer',
-  field:'/field',   // 👈 เพิ่มบรรทัดนี้
+  field:'/field',
   leader:'/leader',
   inspector:'/inspector',
   admin:'/admin'
 }
 
 const ROLES = [
-  { key:'farmer'    as AppRole, icon:'🌾', label:'เกษตรกร',              desc:'บันทึกการปลูก ขาย และสิทธิ์ต่างๆ',      hint:'KF001 / 1234' },
-  { key:'leader'    as AppRole, icon:'👑', label:'หัวหน้ากลุ่ม',          desc:'ยืนยันแปลงและดูแลสมาชิกกลุ่ม',           hint:'LD001 / 5678' },
-  { key:'inspector' as AppRole, icon:'🔍', label:'เจ้าหน้าที่ตรวจสอบ',    desc:'ตรวจสอบแปลงและออกผลการรับรอง',           hint:'IN001 / 9012' },
-  { key:'field'     as AppRole,  icon:'📋',  label:'ทีมภาคสนาม',   desc:'จองเมล็ด ตรวจแปลง และตรวจไม่เผา',  hint:'FD001 / 2222'},
-  { key:'admin'     as AppRole, icon:'⚙️', label:'ผู้ดูแลระบบ (โรงงาน)', desc:'บริหารจัดการราคาและข้อมูลทั้งหมด',        hint:'AD001 / admin' },
+  { key:'farmer' as AppRole, icon:'🌾', label:'เกษตรกร', desc:'บันทึกการปลูก ขาย และสิทธิ์ต่างๆ', hint:'KF001 / 1234' },
+  { key:'field' as AppRole, icon:'📋', label:'ทีมภาคสนาม', desc:'จองเมล็ด ตรวจแปลง และตรวจไม่เผา', hint:'FD001 / 2222' },
+  { key:'leader' as AppRole, icon:'👑', label:'หัวหน้ากลุ่ม', desc:'ยืนยันแปลงและดูแลสมาชิกกลุ่ม', hint:'LD001 / 5678' },
+  { key:'inspector' as AppRole, icon:'🔍', label:'เจ้าหน้าที่ตรวจสอบ', desc:'ตรวจสอบแปลงและออกผลการรับรอง', hint:'IN001 / 9012' },
+  { key:'admin' as AppRole, icon:'⚙️', label:'ผู้ดูแลระบบ (โรงงาน)', desc:'บริหารจัดการราคาและข้อมูลทั้งหมด', hint:'AD001 / admin' },
 ]
 
 const BG: Record<AppRole, string> = {
-  member:'bg-emerald-600', farmer:'bg-emerald-600', field:'bg-teal-600',leader:'bg-amber-500', inspector:'bg-blue-600', admin:'bg-purple-700'
+  member:'bg-emerald-600',
+  farmer:'bg-emerald-600',
+  field:'bg-teal-600',
+  leader:'bg-amber-500',
+  inspector:'bg-blue-600',
+  admin:'bg-purple-700'
 }
 
 export default function LoginPage() {
@@ -86,7 +102,6 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-800 via-emerald-700 to-emerald-600 flex flex-col items-center justify-center p-5">
-      {/* Logo */}
       <div className="text-center mb-8">
         <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-2xl overflow-hidden">
           <img src={logoImage} alt="Logo" className="w-full h-full object-cover" />
