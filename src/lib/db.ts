@@ -518,31 +518,37 @@ export async function findProfileByIdCard(
   idCard: string
 ): Promise<DbResult<AuthUser | null>> {
   if (!supabase) {
-    // Mock: ไม่พบ
     return { data: null, error: null, source: 'mock' }
   }
-  const { data, error } = await supabase
+
+  const { data: profile, error: pErr } = await supabase
     .from('profiles')
-    .select(`
-      id, full_name, phone, id_card,
-      bank_name, bank_account_no, bank_account_name,
-      farmers ( id, code, province, district, village, status )
-    `)
+    .select('id, full_name, phone, id_card, bank_name, bank_account_no, bank_account_name, role')
     .eq('id_card', idCard.trim())
     .maybeSingle()
 
-  if (error) {
-    logSupabaseError('findProfileByIdCard', error)
-    return { data: null, error: error.message, source: 'supabase' }
+  if (pErr) {
+    logSupabaseError('findProfileByIdCard:profile', pErr)
+    return { data: null, error: pErr.message, source: 'supabase' }
   }
-  if (!data) return { data: null, error: null, source: 'supabase' }
 
-  const farmerRows = (data as Record<string, unknown>).farmers as Record<string, unknown>[] | null
-  const farmer = Array.isArray(farmerRows) ? farmerRows[0] : null
+  if (!profile) return { data: null, error: null, source: 'supabase' }
+
+  const { data: farmer, error: fErr } = await supabase
+    .from('farmers')
+    .select('id, profile_id, code, province, district, village, status')
+    .eq('profile_id', profile.id)
+    .maybeSingle()
+
+  if (fErr) {
+    logSupabaseError('findProfileByIdCard:farmer', fErr)
+    return { data: null, error: fErr.message, source: 'supabase' }
+  }
+
   if (!farmer) return { data: null, error: null, source: 'supabase' }
 
   return {
-    data: mapFarmerRow(farmer, data as Record<string, unknown>),
+    data: mapFarmerRow(farmer as Record<string, unknown>, profile as Record<string, unknown>),
     error: null,
     source: 'supabase',
   }
@@ -554,14 +560,19 @@ export async function loginWithIdCardPhone(
   phone: string
 ): Promise<DbResult<AuthUser | null>> {
   if (!supabase) {
-    // Mock login for testing
     if (idCard === '1234567890123' && phone === '0812345678') {
       return {
         data: {
-          id: 'mock-farmer-1', profileId: 'mock-profile-1',
-          name: 'สมชาย ใจดี (Mock)', role: 'farmer', code: 'KF001',
-          phone: '0812345678', idCard: '1234567890123',
-          province: 'บุรีรัมย์', district: 'เมือง', village: 'บ้านดง',
+          id: 'mock-farmer-1',
+          profileId: 'mock-profile-1',
+          name: 'สมชาย ใจดี (Mock)',
+          role: 'farmer',
+          code: 'KF001',
+          phone: '0812345678',
+          idCard: '1234567890123',
+          province: 'บุรีรัมย์',
+          district: 'เมือง',
+          village: 'บ้านดง',
           registrationStatus: 'approved',
         },
         error: null,
@@ -571,34 +582,39 @@ export async function loginWithIdCardPhone(
     return { data: null, error: null, source: 'mock' }
   }
 
-  const { data, error } = await supabase
+  const { data: profile, error: pErr } = await supabase
     .from('profiles')
-    .select(`
-      id, full_name, phone, id_card,
-      bank_name, bank_account_no, bank_account_name,
-      farmers ( id, code, province, district, village, status )
-    `)
+    .select('id, full_name, phone, id_card, bank_name, bank_account_no, bank_account_name, role')
     .eq('id_card', idCard.trim())
     .eq('phone', phone.trim())
     .maybeSingle()
 
-  if (error) {
-    logSupabaseError('loginWithIdCardPhone', error)
-    return { data: null, error: error.message, source: 'supabase' }
+  if (pErr) {
+    logSupabaseError('loginWithIdCardPhone:profile', pErr)
+    return { data: null, error: pErr.message, source: 'supabase' }
   }
-  if (!data) return { data: null, error: null, source: 'supabase' }
 
-  const farmerRows = (data as Record<string, unknown>).farmers as Record<string, unknown>[] | null
-  const farmer = Array.isArray(farmerRows) ? farmerRows[0] : null
+  if (!profile) return { data: null, error: null, source: 'supabase' }
+
+  const { data: farmer, error: fErr } = await supabase
+    .from('farmers')
+    .select('id, profile_id, code, province, district, village, status')
+    .eq('profile_id', profile.id)
+    .maybeSingle()
+
+  if (fErr) {
+    logSupabaseError('loginWithIdCardPhone:farmer', fErr)
+    return { data: null, error: fErr.message, source: 'supabase' }
+  }
+
   if (!farmer) return { data: null, error: null, source: 'supabase' }
 
   return {
-    data: mapFarmerRow(farmer, data as Record<string, unknown>),
+    data: mapFarmerRow(farmer as Record<string, unknown>, profile as Record<string, unknown>),
     error: null,
     source: 'supabase',
   }
 }
-
 /** สมัครสมาชิก: check dup → upsert profile → insert farmer */
 export async function registerFarmerMember(
   payload: RegisterPayload
