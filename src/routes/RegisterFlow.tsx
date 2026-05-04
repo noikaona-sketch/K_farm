@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ChevronLeft, Check, AlertCircle, RefreshCw,
-  User, CreditCard, Phone, MapPin, Building2,camera,
+  User, CreditCard, Phone, MapPin, Building2,Camera,
 } from 'lucide-react'
 import { useAuth } from './AuthContext'
 import { registerFarmerMember } from '../lib/db'
