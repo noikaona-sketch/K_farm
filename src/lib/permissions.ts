@@ -91,6 +91,17 @@ export const DEPT_PERMISSIONS: Record<Department, Permission[]> = {
   ],
 }
 
+export const DEPARTMENTS: { value: Department; label: string; icon: string }[] = [
+  { value: 'field_staff', label: 'ทีมภาคสนาม',   icon: '🧑‍🌾' },
+  { value: 'agri',        label: 'ฝ่ายเกษตร',     icon: '🌱' },
+  { value: 'sales',       label: 'ฝ่ายขาย',       icon: '💰' },
+  { value: 'stock',       label: 'ฝ่ายสต็อก',     icon: '📦' },
+  { value: 'accounting',  label: 'ฝ่ายบัญชี',     icon: '🧾' },
+  { value: 'inspection',  label: 'ฝ่ายตรวจแปลง', icon: '🔍' },
+  { value: 'service',     label: 'ฝ่ายรถ/บริการ', icon: '🚜' },
+  { value: 'it',          label: 'ฝ่าย IT',       icon: '🔐' },
+]
+
 /** Admin menu items — each requires a permission */
 export interface AdminMenuItem {
   to: string

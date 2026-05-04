@@ -3,22 +3,12 @@ import { RefreshCw, Check, AlertCircle, Wifi, WifiOff } from 'lucide-react'
 import { fetchAdminMembers } from '../../lib/db'
 import { isSupabaseReady, supabase } from '../../lib/supabase'
 import {
-  DEPT_PERMISSIONS, ADMIN_MENUS,
+  DEPT_PERMISSIONS, ADMIN_MENUS, DEPARTMENTS,
   type Department, type Permission,
 } from '../../lib/permissions'
 import { ROLE_TABS, ROLE_LABEL, type AppRole } from '../../lib/roles'
 
-// ── ฝ่าย (departments) ────────────────────────────────────────────────────────
-const DEPARTMENTS: { value: Department; label: string; icon: string }[] = [
-  { value: 'agri',       label: 'ฝ่ายเกษตร',     icon: '🌱' },
-  { value: 'sales',      label: 'ฝ่ายขาย',       icon: '💰' },
-  { value: 'stock',      label: 'ฝ่ายสต็อก',     icon: '📦' },
-  { value: 'accounting', label: 'ฝ่ายบัญชี',     icon: '🧾' },
-  { value: 'inspection', label: 'ฝ่ายตรวจแปลง', icon: '🔍' },
-  { value: 'service',    label: 'ฝ่ายรถ/บริการ', icon: '🚜' },
-  { value: 'field_staff',label: 'ทีมภาคสนาม',   icon: '🧑‍🌾' },
-  { value: 'it',         label: 'ฝ่าย IT',       icon: '🔐' },
-]
+// DEPARTMENTS imported from permissions.ts
 
 // ── permission groups ─────────────────────────────────────────────────────────
 const PERM_GROUPS: { group: string; perms: { value: Permission; label: string }[] }[] = [
