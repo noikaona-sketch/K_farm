@@ -83,10 +83,10 @@ export const ROLE_TABS: Record<AppRole, readonly { to: string; label: string; ic
     { to: '/farmer/status',   label: 'สถานะ',    icon: '📋', end: false },
   ],
   field_staff: [
-    // ทีมภาคสนาม — เข้า LINE เพื่อดูงาน ลงบันทึกภาคสนาม
-    { to: '/farmer',          label: 'หน้าแรก',  icon: '🏠', end: true },
-    { to: '/farmer/status',   label: 'งานของฉัน',icon: '📋', end: false },
-    { to: '/farmer/prices',   label: 'ราคา',     icon: '💰', end: false },
+    { to: '/field',              label: 'หน้าแรก',    icon: '🏠', end: true },
+    { to: '/field/seed-booking', label: 'จองเมล็ด',   icon: '🌾', end: false },
+    { to: '/field/farm-inspection', label: 'ตรวจแปลง', icon: '🔍', end: false },
+    { to: '/field/no-burn',      label: 'ไม่เผา',     icon: '🚫', end: false },
   ],
   // ── Web Browser only ───────────────────────────────────────────────────────
   admin: [
@@ -102,7 +102,7 @@ export const ROLE_HOME: Record<AppRole, string> = {
   member:           '/farmer',
   farmer:           '/farmer',
   service_provider: '/farmer',   // เข้า LINE — หน้า service_provider
-  field_staff:      '/farmer',   // เข้า LINE — หน้า field view
+  field_staff:      '/field',    // เข้า LINE — Field App
   leader:           '/leader',
   inspector:        '/inspector',
   admin:            '/admin',
@@ -173,8 +173,8 @@ export function getAccessibleRoles(
   }
   if (role === 'field_staff') {
     dests.push({ key:'field', role:'field_staff', label:'ทีมภาคสนาม',
-      sublabel:'LINE Mini App — ดูงาน บันทึกภาคสนาม',
-      icon:'🧑‍🌾', path:'/farmer', platform:'line' })
+      sublabel:'LINE Mini App — ตรวจแปลง ไม่เผา จองเมล็ด',
+      icon:'🧑‍🌾', path:'/field', platform:'line' })
   }
 
   // leader เห็น leader tab แยกไว้แล้ว แต่ถ้าเป็น farmer+leader ก็เพิ่ม leader option

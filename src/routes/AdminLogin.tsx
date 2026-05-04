@@ -38,7 +38,7 @@ export default function AdminLogin() {
         }
         login(authUser)
         const dests = getAccessibleRoles(acc.role, false)
-        navigate(dests.length > 1 ? '/select-role' : (dests[0]?.path ?? '/admin'), { replace: true })
+        navigate(dests[0]?.path ?? '/field', { replace: true })
       } else {
         setErr('รหัสผู้ใช้หรือรหัสผ่านไม่ถูกต้อง')
         setLoading(false)
