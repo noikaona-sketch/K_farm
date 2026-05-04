@@ -7,9 +7,10 @@ import logoImage from '../assets/logo.png'
 
 // Mock admin credentials — in production replace with Supabase auth
 const STAFF_ACCOUNTS = [
-  { code: 'AD001', password: 'admin', name: 'ผู้ดูแลระบบ', role: 'admin' as const },
-  { code: 'LD001', password: '5678', name: 'ประสิทธิ์ นำทาง', role: 'leader' as const },
-  { code: 'IN001', password: '9012', name: 'วิภา ตรวจการ', role: 'inspector' as const },
+  { code: 'AD001', password: 'admin', name: 'ผู้ดูแลระบบ',      role: 'admin'       as const },
+  { code: 'LD001', password: '5678',  name: 'ประสิทธิ์ นำทาง', role: 'leader'      as const },
+  { code: 'IN001', password: '9012',  name: 'วิภา ตรวจการ',     role: 'inspector'   as const },
+  { code: 'FS001', password: '1234',  name: 'สมศักดิ์ ภาคสนาม', role: 'field_staff' as const },
 ]
 
 export default function AdminLogin() {
@@ -67,6 +68,7 @@ export default function AdminLogin() {
             <p>Admin: AD001 / admin</p>
             <p>Leader: LD001 / 5678</p>
             <p>Inspector: IN001 / 9012</p>
+            <p>ทีมภาคสนาม: FS001 / 1234</p>
           </div>
           {err && (
             <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex gap-2 items-center">
