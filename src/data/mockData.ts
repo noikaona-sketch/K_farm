@@ -236,6 +236,7 @@ export interface SeedVariety {
   id: string
   name: string                // ชื่อพันธุ์
   fullName: string            // ชื่อเต็ม
+  pricePerKg: number          // ราคา บาท/กก.
   seller: string              // ผู้ขายเมล็ดพันธุ์
   mentor: string              // พี่เลี้ยง/เจ้าหน้าที่แนะนำ
   mentorPhone: string
@@ -260,6 +261,7 @@ export const SEED_VARIETIES: SeedVariety[] = [
     id: 'sv1',
     name: 'PAC339',
     fullName: 'ข้าวโพดเลี้ยงสัตว์ PAC 339',
+    pricePerKg: 120,
     seller: 'บริษัท Pacific Seeds (Thailand) จำกัด',
     mentor: 'คุณวิชัย สุขสม',
     mentorPhone: '081-234-5678',
@@ -283,6 +285,7 @@ export const SEED_VARIETIES: SeedVariety[] = [
     id: 'sv2',
     name: 'NK7328',
     fullName: 'ข้าวโพดเลี้ยงสัตว์ NK 7328',
+    pricePerKg: 130,
     seller: 'บริษัท Syngenta (Thailand) จำกัด',
     mentor: 'คุณสมศรี พาณิชย์',
     mentorPhone: '089-876-5432',
@@ -306,6 +309,7 @@ export const SEED_VARIETIES: SeedVariety[] = [
     id: 'sv3',
     name: 'CP888',
     fullName: 'ข้าวโพดเลี้ยงสัตว์ CP 888',
+    pricePerKg: 110,
     seller: 'บริษัท เจริญโภคภัณฑ์เมล็ดพันธุ์ จำกัด',
     mentor: 'คุณประเสริฐ ธัญญา',
     mentorPhone: '085-123-4567',
