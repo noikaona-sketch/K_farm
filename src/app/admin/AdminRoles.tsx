@@ -93,6 +93,10 @@ export default function AdminRoles() {
     setEditPerms(p => ({ ...p, [id]: next }))
   }
 
+  /** สิทธิ์ที่ field staff กำหนดให้ผู้ใหม่ได้: member (รอ approve) + service_provider เท่านั้น */
+  const FIELD_STAFF_DEPTS = ['agri','sales','inspection','service','accounting']
+  const isFieldStaff = (dept: string) => FIELD_STAFF_DEPTS.includes(dept)
+
   const handleSave = async (u: Record<string, unknown>) => {
     const id   = String(u.id)
     const dept = getDept(u) as Department

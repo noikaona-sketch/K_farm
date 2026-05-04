@@ -129,6 +129,7 @@ export default function AdminMemberImport() {
           ))}
         </div>
         <p className="text-xs text-blue-600 mt-2">* <strong>id_card</strong> จำเป็น — ใช้ตรวจซ้ำ (ถ้ามีอยู่แล้วจะ update)</p>
+      <p className="text-xs text-amber-600 mt-1">⚠️ ทีมภาคสนามกำหนด role ได้เฉพาะ <strong>member</strong> และ <strong>service_provider</strong> เท่านั้น</p>
       </div>
 
       {/* Upload zone */}

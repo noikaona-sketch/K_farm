@@ -7,7 +7,7 @@ import {
 import { isSupabaseReady } from '../../lib/supabase'
 import { RefreshCw, Search, Wifi, WifiOff } from 'lucide-react'
 
-const roles    = ['member','farmer','leader','inspector','service_provider','admin']
+const roles    = ['member','farmer','leader']  // สมาชิกเกษตร
 const grades   = ['C','B','A','VIP','Premium']
 const statuses = ['pending_leader','pending_admin','approved','rejected']
 
@@ -73,10 +73,11 @@ export default function MembersPage() {
 
   // summary — ใช้ u.status ตรงๆ (ไม่ผ่าน farmers)
   const rows2 = data as Record<string,unknown>[]
-  const total    = rows2.length
-  const approved = rows2.filter(x => x.status === 'approved').length
-  const pending  = rows2.filter(x => String(x.status ?? '').includes('pending')).length
-  const rejected = rows2.filter(x => x.status === 'rejected').length
+  const farmerRows = rows2.filter(u => u.role === 'farmer' || u.role === 'member')
+  const total    = farmerRows.length
+  const approved = farmerRows.filter(x => x.status === 'approved').length
+  const pending  = farmerRows.filter(x => String(x.status ?? '').includes('pending')).length
+  const rejected = farmerRows.filter(x => x.status === 'rejected').length
 
   // filter + search
   const filtered = rows2.filter(u => {

@@ -35,7 +35,8 @@ export default function RoleSelectPage() {
           <img src={logoImage} className="w-full h-full object-cover" />
         </div>
         <p className="text-emerald-100 text-sm">สวัสดี คุณ{user.name}</p>
-        <p className="text-emerald-200 text-xs mt-0.5">เลือกว่าจะเข้าในฐานะอะไร</p>
+        <p className="text-emerald-200 text-xs mt-0.5">คุณมีสิทธิ์เข้าได้หลายส่วน กรุณาเลือก</p>
+        <p className="text-emerald-300/60 text-[10px] mt-0.5">admin กำหนดสิทธิ์ในระบบหลังบ้าน</p>
       </div>
 
       {/* Choice cards */}
