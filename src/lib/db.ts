@@ -1202,3 +1202,51 @@ export async function updateBookingStatus(
   if (error) logSupabaseError('updateBookingStatus', error)
   return { data: null, error: error?.message ?? null, source: 'supabase' }
 }
+
+// ── Leader assignment ──────────────────────────────────────────────────────────
+
+export interface LeaderOption {
+  id: string        // profiles.id
+  name: string
+  code: string
+}
+
+/** ดึง list ของ leaders (role=leader) สำหรับ dropdown assign */
+export async function fetchLeaders(): Promise<LeaderOption[]> {
+  if (!supabase) {
+    return [
+      { id: 'mock-leader-1', name: 'ประสิทธิ์ นำทาง (Mock)', code: 'LD001' },
+      { id: 'mock-leader-2', name: 'สมศรี หัวหน้า (Mock)',   code: 'LD002' },
+    ]
+  }
+  const { data } = await supabase
+    .from('profiles')
+    .select('id, full_name, id_card')
+    .eq('role', 'leader')
+    .order('full_name')
+  return (data ?? []).map((r: Record<string, unknown>) => ({
+    id:   String(r.id),
+    name: String(r.full_name ?? ''),
+    code: String(r.id_card ?? ''),
+  }))
+}
+
+/** อัปเดต leader_id และ can_inspect ของ farmer */
+export async function assignLeader(
+  farmerId: string,
+  leaderId: string | null,
+  canInspect: boolean
+): Promise<void> {
+  if (!supabase) {
+    console.info('[mock] assignLeader', farmerId, leaderId, canInspect)
+    return
+  }
+  const { error } = await supabase
+    .from('farmers')
+    .update({ leader_id: leaderId, can_inspect: canInspect })
+    .eq('id', farmerId)
+  if (error) {
+    logSupabaseError('assignLeader', error)
+    throw new Error(error.message)
+  }
+}

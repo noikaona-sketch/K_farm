@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import {
   fetchAdminMembers, approveMember, rejectMember,
-  updateMemberAdminFields,
+  updateMemberAdminFields, fetchLeaders, assignLeader,
+  type LeaderOption,
 } from '../../lib/db'
 import { isSupabaseReady } from '../../lib/supabase'
 import { RefreshCw, Search, Wifi, WifiOff } from 'lucide-react'
@@ -27,6 +28,10 @@ export default function MembersPage() {
   const [edits, setEdits]     = useState<Record<string, RowEdit>>({})
   const [acting, setActing]   = useState<string|null>(null)
   const [toast, setToast]     = useState<{ok:boolean;msg:string}|null>(null)
+  const [leaders, setLeaders]   = useState<LeaderOption[]>([])
+  // leader/can_inspect per row: key = farmer.id (from merged row)
+  const [editLeader, setEditLeader]     = useState<Record<string, string>>({})
+  const [editInspect, setEditInspect]   = useState<Record<string, boolean>>({})
 
   const flash = (ok:boolean, msg:string) => {
     setToast({ok,msg}); setTimeout(()=>setToast(null),4000)
@@ -38,17 +43,22 @@ export default function MembersPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetchAdminMembers()
+      const [res, lRes] = await Promise.all([fetchAdminMembers(), fetchLeaders()])
       console.log('[AdminMembers] data:', res)  // debug
+      setLeaders(lRes)
       setData(res as unknown[])
       // seed edit state
       const init: Record<string,RowEdit> = {}
       ;(res as unknown as Record<string,unknown>[]).forEach((u) => {
-        init[u.id as string] = {
+        const uid = u.id as string
+        init[uid] = {
           role:   String(u.role   ?? 'member'),
           grade:  String(u.grade  ?? 'C'),
           status: String(u.status ?? 'pending_leader'),
         }
+        // seed leader/can_inspect from DB row
+        if (u.leader_id) setEditLeader(prev => ({ ...prev, [uid]: String(u.leader_id) }))
+        setEditInspect(prev => ({ ...prev, [uid]: Boolean(u.can_inspect ?? false) }))
       })
       setEdits(init)
     } catch (e) {
@@ -85,7 +95,22 @@ export default function MembersPage() {
     finally   { setActing(null) }
   }
 
-  if (loading) return (
+  const handleAssignLeader = async (u: Record<string, unknown>) => {
+    const id       = String(u.id)
+    const farmerObj = u.farmer as Record<string,unknown> | null
+    const farmerId = String(farmerObj?.id ?? u.id)  // farmers.id
+    const leaderId = editLeader[id] || null
+    const inspect  = editInspect[id] ?? false
+    setActing(id)
+    try {
+      await assignLeader(farmerId, leaderId, inspect)
+      flash(true, `✅ บันทึกหัวหน้ากลุ่ม${inspect ? ' + สิทธิ์ตรวจแปลง' : ''}`)
+      await load()
+    } catch (e) { flash(false, e instanceof Error ? e.message : 'ไม่สำเร็จ') }
+    finally { setActing(null) }
+  }
+
+    if (loading) return (
     <div className="flex items-center justify-center py-24 gap-3 text-gray-500">
       <RefreshCw className="w-6 h-6 animate-spin"/>กำลังโหลด...
     </div>
