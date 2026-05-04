@@ -14,6 +14,11 @@ export default function SignIn() {
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
+  const goRegister = () => {
+    const cleanId = idCard.replace(/[-\s]/g, '').trim()
+    navigate(cleanId ? `/register?idCard=${encodeURIComponent(cleanId)}` : '/register')
+  }
+
   const handleLogin = async () => {
     if (!idCard.trim()) { setErr('กรุณากรอกเลขบัตรประชาชน'); return }
     if (!phone.trim()) { setErr('กรุณากรอกเบอร์โทรศัพท์'); return }
@@ -81,7 +86,7 @@ export default function SignIn() {
                 <p className="font-bold text-red-700 text-sm">เข้าสู่ระบบไม่สำเร็จ</p>
                 <p className="text-red-600 text-sm mt-0.5">{err}</p>
                 {err.includes('สมัครสมาชิก') && (
-                  <button onClick={() => navigate('/register')}
+                  <button onClick={goRegister}
                     className="mt-2 text-emerald-600 font-bold text-sm underline">
                     กดสมัครสมาชิกที่นี่ →
                   </button>
@@ -149,7 +154,7 @@ export default function SignIn() {
 
           <p className="text-center text-gray-400 text-sm">
             ยังไม่มีบัญชี?{' '}
-            <button onClick={() => navigate('/register')} className="text-emerald-600 font-bold">สมัครสมาชิก</button>
+            <button onClick={goRegister} className="text-emerald-600 font-bold">สมัครสมาชิก</button>
           </p>
 
           {/* Admin link */}
