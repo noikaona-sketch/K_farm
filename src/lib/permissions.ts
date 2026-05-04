@@ -107,8 +107,7 @@ export const DEPT_PERMISSIONS: Record<Department, Permission[]> = {
   'field.member_register',
   'field.machine_check',
   'field.transport_check',
-  'system.all',
-],
+  ],
 }
 
 export const DEPARTMENTS: { value: Department; label: string; icon: string }[] = [
