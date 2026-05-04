@@ -45,6 +45,8 @@ export type Permission =
   // Reports
   | 'report.view'
   | 'report.export'
+  | 'team.view'
+  | 'team.edit'
   // System
   | 'system.roles'
   | 'system.all'    // super admin
