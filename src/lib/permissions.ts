@@ -91,22 +91,47 @@ export interface AdminMenuItem {
   label: string
   icon: string
   permission: Permission
+  group: string       // หมวดหมู่เมนู
+  dividerBefore?: boolean
 }
 
 export const ADMIN_MENUS: AdminMenuItem[] = [
-  { to: '/admin',                label: 'Dashboard',                         icon: '📊', permission: 'member.view' },
-  { to: '/admin/members',        label: 'สมาชิก / อนุมัติสมาชิก',            icon: '👥', permission: 'member.view' },
-  { to: '/admin/member-import',  label: 'Import สมาชิกเก่า Excel',            icon: '📥', permission: 'member.import' },
-  { to: '/admin/roles',          label: 'กำหนดสิทธิ์ / Role / Grade',         icon: '🔐', permission: 'system.roles' },
-  { to: '/admin/seed-suppliers', label: 'Supplier เมล็ดพันธุ์',               icon: '🏪', permission: 'seed.edit' },
-  { to: '/admin/seed-varieties', label: 'พันธุ์เมล็ดพันธุ์',                  icon: '🌾', permission: 'seed.edit' },
-  { to: '/admin/seed-stock',     label: 'รับเข้า Stock เมล็ดพันธุ์',          icon: '📦', permission: 'seed.stock' },
-  { to: '/admin/seed-sales',     label: 'ขายเมล็ดพันธุ์',                    icon: '🛒', permission: 'seed.sales' },
-  { to: '/admin/service-providers', label: 'ผู้ให้บริการ รถเกี่ยว/รถไถ/ขนส่ง', icon: '🚜', permission: 'service.view' },
-  { to: '/admin/field-inspections', label: 'ตรวจแปลง',                       icon: '🔍', permission: 'inspection.view' },
-  { to: '/admin/reports',        label: 'รายงาน',                             icon: '📈', permission: 'report.view' },
-  { to: '/admin/prices',         label: 'จัดการราคา',                         icon: '💰', permission: 'price.edit' },
-  { to: '/admin/map',            label: 'แผนที่แปลง',                         icon: '🗺️', permission: 'inspection.view' },
+  // ── Dashboard ──────────────────────────────────────────────────────────────
+  { to: '/admin',                   label: 'Dashboard',                          icon: '📊', permission: 'member.view',     group: 'หลัก' },
+
+  // ── Profile & สมาชิก ───────────────────────────────────────────────────────
+  { to: '/admin/profiles',          label: 'Profile ทั้งหมด',                   icon: '👤', permission: 'member.view',     group: 'คนและสมาชิก', dividerBefore: true },
+  { to: '/admin/members',           label: 'สมาชิก / อนุมัติสมาชิก',            icon: '🌾', permission: 'member.approve',  group: 'คนและสมาชิก' },
+  { to: '/admin/service-providers', label: 'รถ / ผู้ให้บริการ',                  icon: '🚜', permission: 'service.view',    group: 'คนและสมาชิก' },
+
+  // ── เมล็ดพันธุ์ ────────────────────────────────────────────────────────────
+  { to: '/admin/seed-suppliers',    label: 'Supplier เมล็ดพันธุ์',              icon: '🏪', permission: 'seed.edit',       group: 'เมล็ดพันธุ์', dividerBefore: true },
+  { to: '/admin/seed-varieties',    label: 'พันธุ์เมล็ดพันธุ์',                 icon: '🌾', permission: 'seed.edit',       group: 'เมล็ดพันธุ์' },
+  { to: '/admin/seed-stock',        label: 'รับเข้า Stock',                     icon: '📦', permission: 'seed.stock',      group: 'เมล็ดพันธุ์' },
+  { to: '/admin/seed-sales',        label: 'จองเมล็ดพันธุ์',                    icon: '📋', permission: 'seed.sales',      group: 'เมล็ดพันธุ์' },
+  { to: '/admin/seed-debt',         label: 'ลูกหนี้เมล็ดพันธุ์',               icon: '💳', permission: 'seed.sales',      group: 'เมล็ดพันธุ์' },
+
+  // ── วงจรเกษตร ──────────────────────────────────────────────────────────────
+  { to: '/admin/farm-cycles',       label: 'วงจรเกษตรสมาชิก',                   icon: '🔄', permission: 'inspection.view', group: 'วงจรเกษตร', dividerBefore: true },
+  { to: '/admin/field-inspections', label: 'ตรวจแปลง',                          icon: '🔍', permission: 'inspection.edit', group: 'วงจรเกษตร' },
+  { to: '/admin/no-burn',           label: 'กิจกรรมไม่เผา',                     icon: '🚫', permission: 'inspection.view', group: 'วงจรเกษตร' },
+  { to: '/admin/field-calendar',    label: 'ปฏิทินงานภาคสนาม',                  icon: '📅', permission: 'inspection.view', group: 'วงจรเกษตร' },
+
+  // ── ขาย / บริการ ───────────────────────────────────────────────────────────
+  { to: '/admin/sell-queue',        label: 'นัดวันขายสมาชิก',                   icon: '📆', permission: 'price.view',      group: 'ขายและบริการ', dividerBefore: true },
+  { to: '/admin/harvest-booking',   label: 'นัดเกี่ยว / นัดรถ',                 icon: '🚜', permission: 'service.view',    group: 'ขายและบริการ' },
+  { to: '/admin/service-ratings',   label: 'ประเมินผู้ให้บริการ',               icon: '⭐', permission: 'service.view',    group: 'ขายและบริการ' },
+  { to: '/admin/quality',           label: 'คุณภาพผลผลิต',                      icon: '📈', permission: 'inspection.view', group: 'ขายและบริการ' },
+
+  // ── รายงาน ─────────────────────────────────────────────────────────────────
+  { to: '/admin/reports',           label: 'รายงาน',                             icon: '📊', permission: 'report.view',    group: 'รายงาน', dividerBefore: true },
+  { to: '/admin/map',               label: 'แผนที่แปลง',                         icon: '🗺️', permission: 'inspection.view', group: 'รายงาน' },
+
+  // ── ตั้งค่า ────────────────────────────────────────────────────────────────
+  { to: '/admin/roles',             label: 'กำหนดสิทธิ์ / Department',           icon: '🔐', permission: 'system.roles',    group: 'ตั้งค่า', dividerBefore: true },
+  { to: '/admin/member-import',     label: 'Import สมาชิกเก่า Excel',            icon: '📥', permission: 'member.import',   group: 'ตั้งค่า' },
+  { to: '/admin/prices',            label: 'จัดการราคา',                         icon: '💰', permission: 'price.edit',      group: 'ตั้งค่า' },
+  { to: '/admin/settings',          label: 'ตั้งค่าระบบ',                        icon: '⚙️', permission: 'system.roles',    group: 'ตั้งค่า' },
 ]
 
 /** Check if user has a permission */

@@ -50,6 +50,16 @@ import AdminSeedSales        from './app/admin/AdminSeedSales'
 import AdminServiceProviders from './app/admin/AdminServiceProviders'
 import AdminFieldInspections from './app/admin/AdminFieldInspections'
 import AdminReports          from './app/admin/AdminReports'
+import AdminProfiles        from './app/admin/AdminProfiles'
+import AdminSeedDebt        from './app/admin/AdminSeedDebt'
+import AdminFarmCycles      from './app/admin/AdminFarmCycles'
+import AdminNoBurn          from './app/admin/AdminNoBurn'
+import AdminFieldCalendar   from './app/admin/AdminFieldCalendar'
+import AdminSellQueue       from './app/admin/AdminSellQueue'
+import AdminHarvestBooking  from './app/admin/AdminHarvestBooking'
+import AdminServiceRatings  from './app/admin/AdminServiceRatings'
+import AdminQuality         from './app/admin/AdminQuality'
+import AdminSettings        from './app/admin/AdminSettings'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -166,26 +176,47 @@ export default function App() {
               </AdminRoute>
             }
           >
-            <Route index                    element={<AdminDashboard />} />
-            {/* menu routes from spec */}
-            <Route path="members"           element={<AdminMembers />} />
-            <Route path="member-import"     element={<AdminMemberImport />} />
-            <Route path="roles"             element={<AdminRoles />} />
-            <Route path="seed-suppliers"    element={<AdminSeedSuppliers />} />
-            <Route path="seed-varieties"    element={<AdminSeedVarieties />} />
-            <Route path="seed-stock"        element={<AdminSeedStock />} />
-            <Route path="seed-sales"        element={<AdminSeedSales />} />
-            <Route path="service-providers" element={<AdminServiceProviders />} />
-            <Route path="field-inspections" element={<AdminFieldInspections />} />
-            <Route path="reports"           element={<AdminReports />} />
-            {/* legacy */}
-            <Route path="farmers"           element={<AdminFarmers />} />
-            <Route path="map"               element={<AdminMap />} />
-            <Route path="prices"            element={<AdminPrices />} />
-          </Route>
+            <Route index                      element={<AdminDashboard />} />
 
-          {/* Fallback */}
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          {/* ── คนและสมาชิก ── */}
+          <Route path="profiles"            element={<AdminProfiles />} />
+          <Route path="members"             element={<AdminMembers />} />
+          <Route path="service-providers"   element={<AdminServiceProviders />} />
+
+          {/* ── เมล็ดพันธุ์ ── */}
+          <Route path="seed-suppliers"      element={<AdminSeedSuppliers />} />
+          <Route path="seed-varieties"      element={<AdminSeedVarieties />} />
+          <Route path="seed-stock"          element={<AdminSeedStock />} />
+          <Route path="seed-sales"          element={<AdminSeedSales />} />
+          <Route path="seed-debt"           element={<AdminSeedDebt />} />
+
+          {/* ── วงจรเกษตร ── */}
+          <Route path="farm-cycles"         element={<AdminFarmCycles />} />
+          <Route path="field-inspections"   element={<AdminFieldInspections />} />
+          <Route path="no-burn"             element={<AdminNoBurn />} />
+          <Route path="field-calendar"      element={<AdminFieldCalendar />} />
+
+          {/* ── ขายและบริการ ── */}
+          <Route path="sell-queue"          element={<AdminSellQueue />} />
+          <Route path="harvest-booking"     element={<AdminHarvestBooking />} />
+          <Route path="service-ratings"     element={<AdminServiceRatings />} />
+          <Route path="quality"             element={<AdminQuality />} />
+
+          {/* ── รายงาน ── */}
+          <Route path="reports"             element={<AdminReports />} />
+          <Route path="map"                 element={<AdminMap />} />
+
+          {/* ── ตั้งค่า ── */}
+          <Route path="roles"               element={<AdminRoles />} />
+          <Route path="member-import"       element={<AdminMemberImport />} />
+          <Route path="prices"              element={<AdminPrices />} />
+          <Route path="settings"            element={<AdminSettings />} />
+
+          {/* legacy */}
+          <Route path="farmers"             element={<AdminFarmers />} />
+        </Route>
+
+        <Route path="*" element={<Navigate to="/login" replace />} />
 
         </Routes>
       </LiffGuard>
