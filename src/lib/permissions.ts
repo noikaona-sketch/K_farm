@@ -26,6 +26,13 @@ export type Permission =
   | 'seed.edit'
   | 'seed.stock'
   | 'seed.sales'
+ | 'field.view'
+ | 'field.seed_booking'
+ | 'field.farm_inspection'
+ | 'field.no_burn'
+ | 'field.member_register'
+ | 'field.machine_check'
+ | 'field.transport_check'
   // Prices
   | 'price.view'
   | 'price.edit'
@@ -66,10 +73,15 @@ export const DEPT_PERMISSIONS: Record<Department, Permission[]> = {
     'report.view', 'report.export',
   ],
   inspection: [
-    'member.view',
-    'inspection.view', 'inspection.edit',
-    'report.view',
-  ],
+  'member.view',
+  'team.view',
+  'inspection.view',
+  'inspection.edit',
+  'field.view',
+  'field.farm_inspection',
+  'field.no_burn',
+  'report.view',
+],
   service: [
     'service.view', 'service.edit',
     'member.view',
@@ -88,7 +100,15 @@ export const DEPT_PERMISSIONS: Record<Department, Permission[]> = {
     'service.view', 'service.edit',
     'report.view', 'report.export',
     'system.roles', 'system.all',
-  ],
+  'field.view',
+  'field.seed_booking',
+  'field.farm_inspection',
+  'field.no_burn',
+  'field.member_register',
+  'field.machine_check',
+  'field.transport_check',
+  'system.all',
+],
 }
 
 export const DEPARTMENTS: { value: Department; label: string; icon: string }[] = [
