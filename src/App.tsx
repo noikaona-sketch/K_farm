@@ -72,7 +72,7 @@ const ROLE_HOME: Record<AppRole, string> = {
   member:           '/farmer',
   farmer:           '/farmer',
   service_provider: '/farmer',
-  field_staff:      '/farmer',
+  field_staff:      '/field',
   leader:           '/leader',
   inspector:        '/inspector',
   admin:            '/admin',
@@ -173,6 +173,14 @@ export default function App() {
           <Route path="/inspector" element={<RequireAuth minRole="inspector"><MobileLayout /></RequireAuth>}>
             <Route index           element={<InspectorTaskList />} />
             <Route path="form/:id" element={<InspectionForm />} />
+          </Route>
+
+          {/* ── Field Staff — LINE Mini App ── */}
+          <Route path="/field" element={<RequireAuth minRole="field_staff"><MobileLayout /></RequireAuth>}>
+            <Route index                   element={<FieldDashboard />} />
+            <Route path="seed-booking"     element={<FieldSeedBooking />} />
+            <Route path="farm-inspection"  element={<FieldFarmInspection />} />
+            <Route path="no-burn"          element={<FieldNoBurnCheck />} />
           </Route>
 
           {/* ── Admin — Web only, admin role only ── */}

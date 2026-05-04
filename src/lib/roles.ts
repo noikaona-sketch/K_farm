@@ -11,11 +11,11 @@ export type AppRole = 'member' | 'farmer' | 'leader' | 'inspector' | 'service_pr
 const LEVEL: Record<AppRole, number> = {
   member:           0,
   farmer:           1,
-  service_provider: 1,   // เทียบเท่า farmer — เข้า LINE ได้
-  field_staff:      1,   // ทีมภาคสนาม — เข้า LINE (field view) ได้
-  inspector:        2,
-  leader:           3,
-  admin:            4,
+  service_provider: 1,
+  field_staff:      2,   // ทีมภาคสนาม — สูงกว่า farmer เพื่อให้ atLeast('field_staff') ทำงานได้
+  inspector:        3,
+  leader:           4,
+  admin:            5,
 }
 
 /** Is role A at least as powerful as role B? */
