@@ -6,6 +6,7 @@
  */
 
 export type Department =
+  | 'field_staff'  // ทีมภาคสนาม
   | 'agri'          // ฝ่ายเกษตร (approve farmers, field inspection)
   | 'sales'         // ฝ่ายขาย (prices, sale requests)
   | 'stock'         // ฝ่ายสต็อก (seed stock, suppliers)
@@ -72,6 +73,11 @@ export const DEPT_PERMISSIONS: Record<Department, Permission[]> = {
   service: [
     'service.view', 'service.edit',
     'member.view',
+    'report.view',
+  ],
+  field_staff: [
+    'member.view',
+    'inspection.view', 'inspection.edit',
     'report.view',
   ],
   it: [

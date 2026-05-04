@@ -6,9 +6,14 @@ import { DEPT_PERMISSIONS, type Department } from '../lib/permissions'
 import { Menu, X, LogOut, ChevronRight } from 'lucide-react'
 
 const DEPT_LABEL: Record<string, string> = {
-  agri: 'ฝ่ายเกษตร', sales: 'ฝ่ายขาย', stock: 'ฝ่ายสต็อก',
-  accounting: 'ฝ่ายบัญชี', inspection: 'ฝ่ายตรวจแปลง',
-  service: 'ฝ่ายรถ/บริการ', it: 'ฝ่าย IT',
+  field_staff: 'ทีมภาคสนาม',
+  agri:        'ฝ่ายเกษตร',
+  sales:       'ฝ่ายขาย',
+  stock:       'ฝ่ายสต็อก',
+  accounting:  'ฝ่ายบัญชี',
+  inspection:  'ฝ่ายตรวจแปลง',
+  service:     'ฝ่ายรถ/บริการ',
+  it:          'ฝ่าย IT',
 }
 
 function useAdminGuard() {

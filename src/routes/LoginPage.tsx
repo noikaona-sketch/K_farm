@@ -12,8 +12,8 @@ const MOCK_USERS = [
   { id:'a1', name:'ผู้ดูแลระบบ',         role:'admin'     as AppRole, code:'AD001', phone:'0866663333', password:'admin' },
 ]
 
-const ROLE_HOME: Record<AppRole, string> = {
-  member:'/farmer', farmer:'/farmer', leader:'/leader', inspector:'/inspector', admin:'/admin'
+const ROLE_HOME: Partial<Record<AppRole, string>> = {
+  member:'/farmer', farmer:'/farmer', service_provider:'/farmer', field_staff:'/farmer', leader:'/leader', inspector:'/inspector', admin:'/admin'
 }
 
 const ROLES = [
@@ -23,8 +23,8 @@ const ROLES = [
   { key:'admin'     as AppRole, icon:'⚙️', label:'ผู้ดูแลระบบ (โรงงาน)', desc:'บริหารจัดการราคาและข้อมูลทั้งหมด',        hint:'AD001 / admin' },
 ]
 
-const BG: Record<AppRole, string> = {
-  member:'bg-emerald-600', farmer:'bg-emerald-600', leader:'bg-amber-500', inspector:'bg-blue-600', admin:'bg-purple-700'
+const BG: Partial<Record<AppRole, string>> = {
+  member:'bg-emerald-600', farmer:'bg-emerald-600', service_provider:'bg-purple-600', field_staff:'bg-cyan-600', leader:'bg-amber-500', inspector:'bg-blue-600', admin:'bg-gray-800'
 }
 
 export default function LoginPage() {
@@ -52,7 +52,7 @@ export default function LoginPage() {
             idCard: au.code ?? '',
             registrationStatus: 'approved' as const,
           })
-          navigate(ROLE_HOME[u.role], { replace: true })
+          navigate(ROLE_HOME[u.role] ?? '/farmer', { replace: true })
         }
       else { setErr('รหัสผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'); setLoading(false) }
     }, 700)

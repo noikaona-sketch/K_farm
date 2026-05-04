@@ -65,11 +65,13 @@ import AdminSettings        from './app/admin/AdminSettings'
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 const ROLE_HOME: Record<AppRole, string> = {
-  member:    '/farmer',
-  farmer:    '/farmer',
-  leader:    '/leader',
-  inspector: '/inspector',
-  admin:     '/admin',
+  member:           '/farmer',
+  farmer:           '/farmer',
+  service_provider: '/farmer',
+  field_staff:      '/farmer',
+  leader:           '/leader',
+  inspector:        '/inspector',
+  admin:            '/admin',
 }
 
 /** Require login; optionally require minimum role */

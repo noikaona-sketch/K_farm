@@ -7,7 +7,7 @@ import logoImage from '../assets/logo.png'
 export default function MobileLayout() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
-  const role = user?.role ?? 'member'
+  const role = (user?.role ?? 'member') as import('../lib/roles').AppRole
   const tabs = ROLE_TABS[role]
 
   const handleLogout = () => { logout(); navigate('/login', { replace: true }) }
