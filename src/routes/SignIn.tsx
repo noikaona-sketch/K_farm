@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, CreditCard, Phone, RefreshCw, AlertCircle, Eye, EyeOff } from 'lucide-react'
 import { useAuth } from './AuthContext'
+import { getAccessibleRoles } from '../lib/roles'
 import { loginWithIdCardPhone } from '../lib/db'
 import { isSupabaseReady } from '../lib/supabase'
 
@@ -36,11 +37,17 @@ export default function SignIn() {
 
       login(res.data)   // persist ใน localStorage ผ่าน AuthContext
 
-      // route ตาม role
-      if (res.data.role === 'admin') navigate('/admin', { replace: true })
-      else if (res.data.role === 'leader') navigate('/leader', { replace: true })
-      else if (res.data.role === 'inspector') navigate('/inspector', { replace: true })
-      else navigate('/farmer', { replace: true })
+      // ตรวจว่า user มีกี่ role/สิทธิ์
+      const canInspect = Boolean((res.data as unknown as Record<string,unknown>).canInspect)
+      const destinations = getAccessibleRoles(res.data.role, canInspect)
+
+      if (destinations.length > 1) {
+        // มีหลาย option → ให้เลือกเอง
+        navigate('/select-role', { replace: true })
+      } else {
+        // สิทธิ์เดียว → เข้าตรงเลย
+        navigate(destinations[0]?.path ?? '/farmer', { replace: true })
+      }
 
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : 'เกิดข้อผิดพลาด กรุณาลองใหม่')

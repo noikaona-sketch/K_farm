@@ -11,7 +11,8 @@ import AdminRoute   from './routes/AdminRoute'
 import LoginLanding  from './routes/LoginLanding'
 import RegisterFlow  from './routes/RegisterFlow'
 import SignIn        from './routes/SignIn'
-import AdminLogin    from './routes/AdminLogin'
+import AdminLogin       from './routes/AdminLogin'
+import RoleSelectPage   from './routes/RoleSelectPage'
 
 // Farmer / Member
 import FarmerDashboard    from './app/farmer/FarmerDashboard'
@@ -137,7 +138,8 @@ export default function App() {
           <Route path="/login"       element={<RedirectIfAuthed><LoginLanding /></RedirectIfAuthed>} />
           <Route path="/register"    element={<RedirectIfAuthed><RegisterFlow /></RedirectIfAuthed>} />
           <Route path="/signin"      element={<RedirectIfAuthed><SignIn /></RedirectIfAuthed>} />
-          <Route path="/admin-login" element={<RedirectIfAuthed><AdminLogin /></RedirectIfAuthed>} />
+          <Route path="/admin-login"   element={<RedirectIfAuthed><AdminLogin /></RedirectIfAuthed>} />
+          <Route path="/select-role"    element={<RoleSelectPage />} />
 
           {/* ── Farmer / Member — LINE Mini App ── */}
           <Route path="/farmer" element={<RequireAuth minRole="member"><MobileLayout /></RequireAuth>}>

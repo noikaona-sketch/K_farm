@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, RefreshCw, AlertCircle } from 'lucide-react'
 import { useAuth } from './AuthContext'
+import { getAccessibleRoles } from '../lib/roles'
 import logoImage from '../assets/logo.png'
 
 // Mock admin credentials — in production replace with Supabase auth
@@ -24,7 +25,7 @@ export default function AdminLogin() {
     setTimeout(() => {
       const acc = STAFF_ACCOUNTS.find(a => a.code === code.toUpperCase() && a.password === pw)
       if (acc) {
-        login({
+        const authUser = {
           id: acc.code,
           profileId: acc.code,
           name: acc.name,
@@ -32,11 +33,11 @@ export default function AdminLogin() {
           code: acc.code,
           phone: '',
           idCard: '',
-          registrationStatus: 'approved',
-        })
-        if (acc.role === 'admin') navigate('/admin', { replace: true })
-        else if (acc.role === 'leader') navigate('/leader', { replace: true })
-        else navigate('/inspector', { replace: true })
+          registrationStatus: 'approved' as const,
+        }
+        login(authUser)
+        const dests = getAccessibleRoles(acc.role, false)
+        navigate(dests.length > 1 ? '/select-role' : (dests[0]?.path ?? '/admin'), { replace: true })
       } else {
         setErr('รหัสผู้ใช้หรือรหัสผ่านไม่ถูกต้อง')
         setLoading(false)

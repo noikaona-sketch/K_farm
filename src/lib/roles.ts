@@ -109,3 +109,70 @@ export const ROLE_COLOR: Record<AppRole, string> = {
   inspector: 'bg-blue-100 text-blue-700',
   admin:     'bg-purple-100 text-purple-700',
 }
+
+/**
+ * คำนวณว่า user คนนี้ เข้าถึงได้กี่ "โลก" (LINE app vs Admin web)
+ * คืน list ของ destination ที่เข้าได้
+ */
+export interface RoleDestination {
+  key: string           // unique key
+  role: AppRole
+  label: string         // ชื่อที่แสดงให้ user เลือก
+  sublabel: string      // คำอธิบาย
+  icon: string
+  path: string          // redirect path
+  platform: 'line' | 'web'
+}
+
+export function getAccessibleRoles(
+  role: AppRole,
+  canInspect: boolean
+): RoleDestination[] {
+  const dests: RoleDestination[] = []
+
+  // ทุกคนเข้า farmer ได้ (member / farmer)
+  if (['member','farmer','leader','inspector'].includes(role)) {
+    dests.push({
+      key:       'farmer',
+      role:      role === 'leader' ? 'leader' : role === 'inspector' ? 'inspector' : role,
+      label:     role === 'leader' ? 'หัวหน้ากลุ่ม' : 'เกษตรกร / สมาชิก',
+      sublabel:  'LINE Mini App — ปักหมุด แจ้งปลูก จองเมล็ด',
+      icon:      '🌽',
+      path:      role === 'leader' ? '/leader' : role === 'inspector' ? '/inspector' : '/farmer',
+      platform:  'line',
+    })
+  }
+
+  // leader เห็น leader tab แยกไว้แล้ว แต่ถ้าเป็น farmer+leader ก็เพิ่ม leader option
+  if (role === 'leader') {
+    // leader เป็น default เดียว — ไม่ต้องเพิ่ม
+  }
+
+  // can_inspect → เข้า inspector view ได้ด้วย (เพิ่ม option)
+  if (canInspect && role !== 'inspector') {
+    dests.push({
+      key:      'inspector',
+      role:     'inspector',
+      label:    'ตรวจแปลง',
+      sublabel: 'ผู้มีสิทธิ์รับรองแปลง — บันทึกการตรวจ',
+      icon:     '🔍',
+      path:     '/inspector',
+      platform: 'line',
+    })
+  }
+
+  // admin → เข้า web admin ได้
+  if (role === 'admin') {
+    dests.push({
+      key:      'admin',
+      role:     'admin',
+      label:    'ระบบหลังบ้าน',
+      sublabel: 'Admin Web — จัดการสมาชิก ราคา รายงาน',
+      icon:     '🖥️',
+      path:     '/admin',
+      platform: 'web',
+    })
+  }
+
+  return dests
+}

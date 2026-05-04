@@ -5,6 +5,7 @@ import {
   User, CreditCard, Phone, MapPin, Building2,
 } from 'lucide-react'
 import { useAuth } from './AuthContext'
+import { getAccessibleRoles } from '../lib/roles'
 import { registerFarmerMember } from '../lib/db'
 import { isSupabaseReady } from '../lib/supabase'
 
@@ -104,7 +105,8 @@ export default function RegisterFlow() {
       setStep('สมัครสำเร็จ! ✓')
       if (res.data) {
         login(res.data)
-        navigate('/farmer', { replace: true })
+        const dests = getAccessibleRoles(res.data.role, false)
+        navigate(dests.length > 1 ? '/select-role' : (dests[0]?.path ?? '/farmer'), { replace: true })
       }
     } catch (ex: unknown) {
       setErr(ex instanceof Error ? ex.message : 'เกิดข้อผิดพลาด กรุณาลองใหม่')
