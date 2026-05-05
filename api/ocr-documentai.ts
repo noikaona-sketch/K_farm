@@ -58,6 +58,14 @@ function cutBeforeMarkers(text: string, markers: string[]) {
   return text.slice(0, end).trim()
 }
 
+function stripDatesAndNoiseFromAddress(address: string) {
+  return cleanSpaces(address)
+    .replace(/\s*\d{1,2}\s*(?:ม\.ค\.|ก\.พ\.|มี\.ค\.|เม\.ย\.|พ\.ค\.|มิ\.ย\.|ก\.ค\.|ส\.ค\.|ก\.ย\.|ต\.ค\.|พ\.ย\.|ธ\.ค\.)\s*\d{4}.*$/i, '')
+    .replace(/\s*\d{1,2}\s*(?:Jan\.?|Feb\.?|Mar\.?|Apr\.?|May|Jun\.?|Jul\.?|Aug\.?|Sep\.?|Oct\.?|Nov\.?|Dec\.?)\s*\d{4}.*$/i, '')
+    .replace(/\b\d{1,3}\s+\d{1,3}\s+\d{1,3}\s+\d{1,3}\b.*$/g, '')
+    .trim()
+}
+
 function extractDateAfter(text: string, markers: string[]) {
   const compact = cleanSpaces(text)
   const datePattern = '(\\d{1,2}\\s*(?:ม\\.ค\\.|ก\\.พ\\.|มี\\.ค\\.|เม\\.ย\\.|พ\\.ค\\.|มิ\\.ย\\.|ก\\.ค\\.|ส\\.ค\\.|ก\\.ย\\.|ต\\.ค\\.|พ\\.ย\\.|ธ\\.ค\\.|Jan\\.?|Feb\\.?|Mar\\.?|Apr\\.?|May|Jun\\.?|Jul\\.?|Aug\\.?|Sep\\.?|Oct\\.?|Nov\\.?|Dec\\.?)\\s*\\d{4})'
@@ -81,10 +89,9 @@ function extractAddress(compact: string) {
   let address = compact.slice(start).replace(/^ที่อยู่\s*/i, '').replace(/^Address\s*/i, '').trim()
   address = cutBeforeMarkers(address, [
     'วันออกบัตร', 'Date of Issue', 'วันบัตรหมดอายุ', 'Date of Expiry',
-    'เจ้าพนักงานออกบัตร', 'กระทรวงมหาดไทย', 'กระทรวงมหาดไท', 'Date of Expiry', 'Date of Issue'
+    'เจ้าพนักงานออกบัตร', 'กระทรวงมหาดไทย', 'กระทรวงมหาดไท'
   ])
-  address = address.replace(/\b\d{1,3}\s+\d{1,3}\s+\d{1,3}\s+\d{1,3}\b.*$/g, '').trim()
-  return cleanSpaces(address)
+  return stripDatesAndNoiseFromAddress(address)
 }
 
 function parseThaiDocumentText(text: string): OcrResult {
