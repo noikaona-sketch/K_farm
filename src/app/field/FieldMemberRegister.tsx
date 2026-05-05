@@ -31,6 +31,7 @@ export default function FieldMemberRegister() {
   const [identityOcr, setIdentityOcr] = useState<IdentityOcrResult | null>(null)
   const [saving, setSaving] = useState(false)
   const [ocrLoading, setOcrLoading] = useState(false)
+  const [showOcrRaw, setShowOcrRaw] = useState(false)
   const [ok, setOk] = useState('')
   const [error, setError] = useState('')
 
@@ -38,7 +39,7 @@ export default function FieldMemberRegister() {
     setFullName(''); setPhone(''); setIdCard(''); setAddress('')
     setProvince('บุรีรัมย์'); setDistrict(''); setSubdistrict('')
     setBankName('ธ.ก.ส.'); setBankAccountNo(''); setBankAccountName('')
-    setIdImage(null); setIdentityOcr(null)
+    setIdImage(null); setIdentityOcr(null); setShowOcrRaw(false)
   }
 
   const applyOcrToForm = (ocr: IdentityOcrResult) => {
@@ -59,6 +60,7 @@ export default function FieldMemberRegister() {
     setError('')
     setOk('')
     setIdentityOcr(null)
+    setShowOcrRaw(false)
     setOcrLoading(true)
     try {
       const processed = await preprocessImageForOcr(file, {
@@ -68,7 +70,9 @@ export default function FieldMemberRegister() {
       })
       setIdImage({ file: processed.file, preview: processed.dataUrl })
       const ocr = await runIdentityOcr(processed.file)
+      console.info('[FieldMemberRegister OCR]', ocr)
       setIdentityOcr(ocr)
+      setShowOcrRaw(true)
       applyOcrToForm(ocr)
       setOk('อ่านข้อมูลจากบัตรแล้ว กรุณาตรวจสอบก่อนบันทึก')
     } catch (err) {
@@ -169,6 +173,18 @@ export default function FieldMemberRegister() {
         </label>
         {ocrLoading && <div className="rounded-xl bg-blue-50 border border-blue-200 text-blue-700 p-3 text-sm flex items-center gap-2"><RefreshCw className="w-4 h-4 animate-spin" />กำลังอ่านข้อมูลจากบัตร...</div>}
         {idImage && <img src={idImage.preview} className="w-full max-h-56 object-cover rounded-xl border" />}
+        {identityOcr?.raw_text && (
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700">
+            <button type="button" onClick={() => setShowOcrRaw(v => !v)} className="font-bold text-emerald-700 mb-2">
+              {showOcrRaw ? 'ซ่อนข้อความ OCR' : 'แสดงข้อความ OCR ทั้งหมด'}
+            </button>
+            {showOcrRaw && (
+              <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed">
+                {identityOcr.raw_text}
+              </pre>
+            )}
+          </div>
+        )}
         <input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="ชื่อ-นามสกุล ภาษาไทย *" className="w-full border rounded-xl p-3" />
         <input value={idCard} onChange={(e) => setIdCard(e.target.value)} placeholder="เลขบัตรประชาชน 13 หลัก *" inputMode="numeric" className="w-full border rounded-xl p-3" />
         <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="เบอร์โทรศัพท์ *" className="w-full border rounded-xl p-3" />
