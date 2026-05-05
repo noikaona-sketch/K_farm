@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, CheckCircle, CreditCard, MapPin, RefreshCw, UserPlus } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../routes/AuthContext'
+import { preprocessImageForOcr } from '../../lib/imagePreprocess'
 
 const genFarmerCode = () => `KF${Date.now().toString().slice(-6)}`
 
@@ -39,6 +40,24 @@ export default function FieldMemberRegister() {
       },
       () => setError('ไม่สามารถอ่านพิกัดได้')
     )
+  }
+
+  const handleIdImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setError('')
+    try {
+      const processed = await preprocessImageForOcr(file, {
+        maxSide: 1200,
+        quality: 0.8,
+        centerCrop: true,
+      })
+      setIdImage({ file: processed.file, preview: processed.dataUrl })
+    } catch (err) {
+      console.warn('[FieldMemberRegister] image preprocess failed:', err)
+      setIdImage({ file, preview: URL.createObjectURL(file) })
+      setError('ย่อรูปไม่สำเร็จ ระบบจะใช้รูปต้นฉบับแทน')
+    }
   }
 
   const runOcrMock = () => {
@@ -117,7 +136,7 @@ export default function FieldMemberRegister() {
         <div className="font-bold flex items-center gap-2"><CreditCard className="w-5 h-5" />ข้อมูลบัตร / สมาชิก</div>
         <label className="w-full border rounded-xl py-3 font-bold flex items-center justify-center gap-2 cursor-pointer">
           📷 ถ่ายรูปบัตรประชาชน
-          <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (!file) return; setIdImage({ file, preview: URL.createObjectURL(file) }) }} />
+          <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleIdImageChange} />
         </label>
         {idImage && <img src={idImage.preview} className="w-full max-h-56 object-cover rounded-xl border" />}
         <button type="button" onClick={runOcrMock} className="w-full border rounded-xl py-3 font-bold">อ่านข้อมูลจากบัตร (OCR)</button>
