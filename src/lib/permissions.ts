@@ -42,16 +42,11 @@ export interface AdminMenuItem {
 export const ADMIN_MENUS: AdminMenuItem[] = [
   { to: '/admin', label: 'Dashboard', icon: '📊', permission: 'member.view' },
 
-  { to: '/admin/members', label: 'สมาชิก / ติดตามสถานะ', icon: '👥', permission: 'member.view' },
-  { to: '/admin/member-dashboard', label: 'สรุปจำนวนสมาชิก', icon: '📌', permission: 'member.view' },
+  { to: '/admin/members', label: 'สมาชิก', icon: '👥', permission: 'member.view' },
+  { to: '/admin/service-providers', label: 'รถร่วม', icon: '🚜', permission: 'service.view' },
+  { to: '/admin/staff', label: 'พนักงาน', icon: '👤', permission: 'team.view' },
   { to: '/admin/member-import', label: 'Import สมาชิกเก่า Excel', icon: '📥', permission: 'member.import' },
   { to: '/admin/roles', label: 'กำหนดสิทธิ์ / Role / Grade', icon: '🔐', permission: 'system.roles' },
-
-  { to: '/admin/service-providers', label: 'รถ / ผู้ให้บริการ', icon: '🚜', permission: 'service.view' },
-  { to: '/admin/vehicle-dashboard', label: 'สรุปรถ / สถานะผู้ให้บริการ', icon: '🚛', permission: 'service.view' },
-
-  { to: '/admin/team', label: 'ทีมงาน / Admin หลายส่วนงาน', icon: '🏢', permission: 'team.view' },
-  { to: '/admin/team-permissions', label: 'ทีมงาน + Permission Matrix', icon: '🧩', permission: 'team.view' },
 
   { to: '/admin/seed-suppliers', label: 'Supplier เมล็ดพันธุ์', icon: '🏪', permission: 'seed.edit' },
   { to: '/admin/seed-varieties', label: 'พันธุ์เมล็ดพันธุ์', icon: '🌾', permission: 'seed.edit' },
