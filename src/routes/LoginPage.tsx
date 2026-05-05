@@ -46,6 +46,8 @@ const MOCK_USERS: MockUser[] = [
 const ROLE_HOME: Record<AppRole, string> = {
   member:'/farmer',
   farmer:'/farmer',
+  vehicle:'/service',
+  service:'/service',
   field:'/field',
   leader:'/leader',
   inspector:'/inspector',
@@ -63,6 +65,8 @@ const ROLES = [
 const BG: Record<AppRole, string> = {
   member:'bg-emerald-600',
   farmer:'bg-emerald-600',
+  vehicle:'bg-orange-500',
+  service:'bg-orange-500',
   field:'bg-teal-600',
   leader:'bg-amber-500',
   inspector:'bg-blue-600',
