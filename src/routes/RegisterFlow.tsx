@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   ChevronLeft, Check, AlertCircle, RefreshCw,
-  User, CreditCard, Phone, MapPin, Building2,
+  User, CreditCard, Phone, MapPin, Building2,Camera,
 } from 'lucide-react'
 import { useAuth } from './AuthContext'
 import { registerFarmerMember } from '../lib/db'
@@ -60,7 +60,25 @@ export default function RegisterFlow() {
   const [step, setStep] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [fieldErr, setFieldErr] = useState<Record<string, string>>({})
+  const [identityPhoto, setIdentityPhoto] = useState<File | null>(null)
+  const [identityPhotoPreview, setIdentityPhotoPreview] = useState<string | null>(null)
 
+  const handleIdentityPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0] ?? null
+  setIdentityPhoto(file)
+  setIdentityPhotoPreview(prev => {
+    if (prev) URL.revokeObjectURL(prev)
+    return file ? URL.createObjectURL(file) : null
+  })
+  if (file && fieldErr.identity_photo) {
+    setFieldErr(prev => {
+      const next = { ...prev }
+      delete next.identity_photo
+      return next
+    })
+  }
+}
+  
   const getValues = () => {
     const fd = new FormData(formRef.current!)
     return {
@@ -84,6 +102,7 @@ export default function RegisterFlow() {
     if (!v.district)                       e.district          = 'กรุณากรอกอำเภอ'
     if (!v.bank_account_no)               e.bank_account_no   = 'กรุณากรอกเลขบัญชี'
     if (!v.bank_account_name)             e.bank_account_name = 'กรุณากรอกชื่อบัญชี'
+    if (!identityPhoto) e.identity_photo = 'กรุณาแนบรูปเอกสารยืนยันตัวตน'
     return e
   }
 
@@ -103,6 +122,7 @@ export default function RegisterFlow() {
 
     try {
       setStep('กำลังตรวจสอบข้อมูล...')
+      console.info('[RegisterFlow] identity photo selected:', identityPhoto?.name)
       const res = await registerFarmerMember(values)
       if (res.error && isSupabaseReady) throw new Error(res.error)
       setStep('สมัครสำเร็จ! ✓')
@@ -186,7 +206,35 @@ export default function RegisterFlow() {
             placeholder="08x-xxx-xxxx" inputMode="tel" icon={Phone}
             note="เบอร์ที่ใช้ตอนสมัคร = รหัสผ่าน" errMsg={fieldErr.phone} />
         </div>
-
+<div>
+  <label className="text-sm font-semibold text-gray-700 flex items-center gap-1.5 mb-1.5">
+    <Camera className="w-4 h-4 text-emerald-600" />
+    รูปเอกสารยืนยันตัวตน *
+  </label>
+  <input
+    name="identity_photo"
+    type="file"
+    accept="image/*"
+    capture="environment"
+    onChange={handleIdentityPhotoChange}
+    className={`w-full border-2 rounded-2xl px-4 py-3.5 text-sm bg-white
+      ${fieldErr.identity_photo ? 'border-red-400 bg-red-50' : 'border-gray-200 focus:border-emerald-500'}`}
+  />
+  {fieldErr.identity_photo && (
+    <p className="text-red-500 text-xs mt-1 ml-1">{fieldErr.identity_photo}</p>
+  )}
+  {!fieldErr.identity_photo && (
+    <p className="text-gray-400 text-xs mt-1 ml-1">ถ่ายหรือแนบรูปให้ชัดเจน</p>
+  )}
+  {identityPhotoPreview && (
+    <img
+      src={identityPhotoPreview}
+      alt="ตัวอย่างรูปเอกสาร"
+      className="mt-3 w-full max-h-56 object-contain rounded-2xl border border-gray-200 bg-gray-50"
+    />
+  )}
+</div>
+        
         {/* ── Section 2: ที่อยู่ ── */}
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5 space-y-4">
           <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
