@@ -492,6 +492,11 @@ export interface RegisterPayload {
   bank_name?: string
   bank_account_no?: string
   bank_account_name?: string
+
+  // OCR audit fields
+  identity_ocr_json?: unknown
+  identity_ocr_confidence?: number | null
+  identity_ocr_raw_text?: string | null
 }
 
 function mapFarmerRow(row: Record<string, unknown>, profile: Record<string, unknown>): AuthUser {
