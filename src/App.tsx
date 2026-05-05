@@ -2,7 +2,7 @@ import React, { useEffect } from 'react'
 import { Routes, Route, Navigate, Link } from 'react-router-dom'
 import { AuthProvider, useAuth } from './routes/AuthContext'
 import { atLeast } from './lib/roles'
-import type { AppRole } from './lib/roles'
+import type { AppRole, Feature } from './lib/roles'
 import MobileLayout from './layouts/MobileLayout'
 import AdminLayout  from './layouts/AdminLayout'
 import AdminRoute   from './routes/AdminRoute'
@@ -69,10 +69,20 @@ const ROLE_HOME: Record<AppRole, string> = {
   admin:     '/admin',
 }
 
-function RequireAuth({ minRole = 'member', children }: { minRole?: AppRole; children: React.ReactNode }) {
-  const { user, homePath } = useAuth()
+function RequireAuth({
+  minRole = 'member',
+  feature,
+  children,
+}: {
+  minRole?: AppRole
+  feature?: Feature
+  children: React.ReactNode
+}) {
+  const { user, homePath, canAccess } = useAuth()
   if (!user) return <Navigate to="/login" replace />
-  if (!atLeast(user.role ?? 'member', minRole)) return <Navigate to={homePath || ROLE_HOME[user.role ?? 'member']} replace />
+
+  const allowed = feature ? canAccess(feature) : atLeast(user.role ?? 'member', minRole)
+  if (!allowed) return <Navigate to={homePath || ROLE_HOME[user.role ?? 'member']} replace />
   return <>{children}</>
 }
 
@@ -196,31 +206,31 @@ export default function App() {
         <Route path="prices" element={<PriceAnnouncement />} />
         <Route path="tier" element={<MemberTier />} />
         <Route path="no-burn" element={<FarmerNoBurnPage />} />
-        <Route path="pin" element={<RequireAuth minRole="farmer"><PinFarm /></RequireAuth>} />
-        <Route path="farms" element={<RequireAuth minRole="farmer"><MyFarms /></RequireAuth>} />
-        <Route path="farms/add" element={<RequireAuth minRole="farmer"><AddFarm /></RequireAuth>} />
-        <Route path="planting" element={<RequireAuth minRole="farmer"><PlantingRecord /></RequireAuth>} />
+        <Route path="pin" element={<RequireAuth feature="farming"><PinFarm /></RequireAuth>} />
+        <Route path="farms" element={<RequireAuth feature="farming"><MyFarms /></RequireAuth>} />
+        <Route path="farms/add" element={<RequireAuth feature="farming"><AddFarm /></RequireAuth>} />
+        <Route path="planting" element={<RequireAuth feature="farming"><PlantingRecord /></RequireAuth>} />
       </Route>
 
-      <Route path="/service" element={<RequireAuth minRole="vehicle"><MobileLayout /></RequireAuth>}>
+      <Route path="/service" element={<RequireAuth feature="service_work"><MobileLayout /></RequireAuth>}>
         <Route index element={<ServiceHome />} />
         <Route path="schedule" element={<AdminPlaceholderPage title="ตารางนัดงาน" icon="📅" />} />
         <Route path="income" element={<AdminPlaceholderPage title="ประวัติรายรับ" icon="💰" />} />
-        <Route path="team" element={<AdminPlaceholderPage title="รถในทีม" icon="👥" />} />
+        <Route path="team" element={<RequireAuth feature="leader_approve"><AdminPlaceholderPage title="รถในทีม" icon="👥" /></RequireAuth>} />
       </Route>
 
-      <Route path="/field" element={<RequireAuth minRole="field"><MobileLayout /></RequireAuth>}>
+      <Route path="/field" element={<RequireAuth feature="field_work"><MobileLayout /></RequireAuth>}>
         <Route index element={<FieldDashboardHome />} />
         <Route path="member-register" element={<RequirePermission permission="field.member_register" fallback="/field"> <FieldMemberRegister /> </RequirePermission>  }/>
         <Route path="seed-booking" element={<RequirePermission permission="field.seed_booking" fallback="/field"><FieldSeedBooking /></RequirePermission>} />
         <Route path="farm-inspection" element={<RequirePermission permission="field.farm_inspection" fallback="/field"><FieldFarmInspection /></RequirePermission>} />
         <Route path="no-burn" element={<RequirePermission permission="field.no_burn" fallback="/field"><div className="p-5"><h1 className="text-xl font-bold">ตรวจไม่เผา</h1><p className="text-gray-500 text-sm mt-2">ฟอร์มตรวจหลักฐานไม่เผา</p></div></RequirePermission>} />
       </Route>      
-      <Route path="/leader" element={<RequireAuth minRole="leader"><MobileLayout /></RequireAuth>}>
+      <Route path="/leader" element={<RequireAuth feature="leader_approve"><MobileLayout /></RequireAuth>}>
         <Route index element={<LeaderDashboard />} />
         <Route path="confirm" element={<FarmConfirmation />} />
       </Route>
-      <Route path="/inspector" element={<RequireAuth minRole="inspector"><MobileLayout /></RequireAuth>}>
+      <Route path="/inspector" element={<RequireAuth feature="inspection"><MobileLayout /></RequireAuth>}>
         <Route index element={<InspectorTaskList />} />
         <Route path="form/:id" element={<InspectionForm />} />
       </Route>
