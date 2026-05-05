@@ -78,6 +78,7 @@ export default function FieldMemberRegister() {
     setError('')
     setOk('')
     setIdentityOcr(null)
+    setOcrLoading(true)
     try {
       const processed = await preprocessImageForOcr(file, {
         maxSide: 1200,
@@ -85,7 +86,6 @@ export default function FieldMemberRegister() {
         centerCrop: true,
       })
       setIdImage({ file: processed.file, preview: processed.dataUrl })
-      setOcrLoading(true)
       const ocr = await runIdentityOcr(processed.file)
       setIdentityOcr(ocr)
       applyOcrToForm(ocr)
@@ -93,24 +93,6 @@ export default function FieldMemberRegister() {
     } catch (err) {
       console.warn('[FieldMemberRegister] OCR failed:', err)
       setIdImage({ file, preview: URL.createObjectURL(file) })
-      setError(err instanceof Error ? err.message : 'อ่านข้อความจากรูปไม่สำเร็จ กรุณากรอกเอง')
-    } finally {
-      setOcrLoading(false)
-    }
-  }
-
-  const runOcr = async () => {
-    if (!idImage) { setError('กรุณาถ่ายรูปบัตรก่อน'); return }
-    setError('')
-    setOk('')
-    setOcrLoading(true)
-    try {
-      const ocr = await runIdentityOcr(idImage.file)
-      setIdentityOcr(ocr)
-      applyOcrToForm(ocr)
-      setOk('อ่านข้อมูลจากบัตรแล้ว กรุณาตรวจสอบก่อนบันทึก')
-    } catch (err) {
-      console.warn('[FieldMemberRegister] OCR failed:', err)
       setError(err instanceof Error ? err.message : 'อ่านข้อความจากรูปไม่สำเร็จ กรุณากรอกเอง')
     } finally {
       setOcrLoading(false)
@@ -249,10 +231,8 @@ export default function FieldMemberRegister() {
           📷 ถ่ายรูปบัตรประชาชน
           <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleIdImageChange} />
         </label>
+        {ocrLoading && <div className="rounded-xl bg-blue-50 border border-blue-200 text-blue-700 p-3 text-sm flex items-center gap-2"><RefreshCw className="w-4 h-4 animate-spin" />กำลังอ่านข้อมูลจากบัตร...</div>}
         {idImage && <img src={idImage.preview} className="w-full max-h-56 object-cover rounded-xl border" />}
-        <button type="button" onClick={runOcr} disabled={ocrLoading || !idImage} className="w-full border rounded-xl py-3 font-bold disabled:opacity-50">
-          {ocrLoading ? 'กำลังอ่านข้อมูลจากบัตร...' : 'อ่านข้อมูลจากบัตร (OCR)'}
-        </button>
         <input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder={registerType === 'member' ? 'ชื่อ-นามสกุล' : 'ชื่อเจ้าของรถ'} className="w-full border rounded-xl p-3" />
         <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="เบอร์โทร" className="w-full border rounded-xl p-3" />
         <input value={idCard} onChange={(e) => setIdCard(e.target.value)} placeholder="เลขบัตรประชาชน" className="w-full border rounded-xl p-3" />
