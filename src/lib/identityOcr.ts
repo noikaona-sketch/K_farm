@@ -13,6 +13,43 @@ export type IdentityOcrResult = {
   raw_text: string
 }
 
+function isThaiText(value: string) {
+  return /[ก-๙]/.test(value)
+}
+
+function cleanName(value: string) {
+  return value
+    .replace(/^(ชื่อ|ชื่อตัวและชื่อสกุล|Thai Name|Name|Full Name)\s*[:：]?\s*/i, '')
+    .replace(/^(นาย|นาง|นางสาว)\s+/, '$1')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function extractThaiNameFromRawText(rawText: string) {
+  const lines = rawText.split(/\r?\n/).map(line => line.trim()).filter(Boolean)
+
+  for (const line of lines) {
+    const cleaned = cleanName(line)
+    if (
+      isThaiText(cleaned) &&
+      /^(นาย|นาง|นางสาว)\s*[ก-๙]/.test(cleaned) &&
+      !/(เลข|บัตร|ประชาชน|เกิด|ที่อยู่|ศาสนา|วัน|หมดอายุ|ออกบัตร)/.test(cleaned)
+    ) {
+      return cleaned
+    }
+  }
+
+  const compact = rawText.replace(/\s+/g, ' ').trim()
+  const match = compact.match(/(นาย|นางสาว|นาง)\s*[ก-๙][ก-๙\s.]{3,80}/)
+  return match ? cleanName(match[0]) : ''
+}
+
+export function preferThaiIdentityName(ocr: IdentityOcrResult): IdentityOcrResult {
+  if (isThaiText(ocr.full_name)) return ocr
+  const thaiName = extractThaiNameFromRawText(ocr.raw_text ?? '')
+  return thaiName ? { ...ocr, full_name: thaiName } : ocr
+}
+
 export async function runIdentityOcr(file: File): Promise<IdentityOcrResult> {
   const processed = await preprocessImageForOcr(file, {
     maxSide: 1200,
@@ -31,5 +68,5 @@ export async function runIdentityOcr(file: File): Promise<IdentityOcrResult> {
 
   const json = await res.json()
   if (!res.ok) throw new Error(json.error ?? 'อ่านข้อความจากรูปไม่สำเร็จ')
-  return json as IdentityOcrResult
+  return preferThaiIdentityName(json as IdentityOcrResult)
 }
