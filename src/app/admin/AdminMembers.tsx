@@ -9,8 +9,7 @@ import { RefreshCw, Search, Wifi, WifiOff } from 'lucide-react'
 type BaseType = 'farmer' | 'service' | 'staff'
 type Grade = 'A' | 'B' | 'C'
 
-const roles     = ['member','farmer','leader','inspector','service','vehicle','admin']
-const baseTypes: BaseType[] = ['farmer','service','staff']
+const roles     = ['member','farmer','leader','inspector','admin']
 const grades: Grade[] = ['C','B','A']
 const statuses  = ['pending_leader','pending_admin','approved','rejected','suspended']
 
@@ -29,10 +28,6 @@ interface RowEdit {
   status: string
   is_leader: boolean
   can_inspect: boolean
-}
-
-function asBaseType(value: unknown): BaseType {
-  return value === 'service' || value === 'staff' ? value : 'farmer'
 }
 
 function asGrade(value: unknown): Grade {
@@ -61,11 +56,19 @@ function makeCapabilities(e: RowEdit): string[] {
   ].filter(Boolean) as string[]
 }
 
+function uniqueOptions(rows: Record<string, unknown>[], key: string) {
+  return Array.from(new Set(rows.map(r => String(r[key] ?? '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'th'))
+}
+
 export default function MembersPage() {
   const [data, setData]       = useState<unknown[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch]   = useState('')
   const [filterRole, setFilterRole] = useState('all')
+  const [filterProvince, setFilterProvince] = useState('all')
+  const [filterDistrict, setFilterDistrict] = useState('all')
+  const [filterSubdistrict, setFilterSubdistrict] = useState('all')
+  const [filterCapability, setFilterCapability] = useState<'all' | 'leader' | 'inspector' | 'leader_inspector'>('all')
   const [edits, setEdits]     = useState<Record<string, RowEdit>>({})
   const [acting, setActing]   = useState<string|null>(null)
   const [toast, setToast]     = useState<{ok:boolean;msg:string}|null>(null)
@@ -88,7 +91,7 @@ export default function MembersPage() {
         const caps = readCapabilities(u)
         init[u.id as string] = {
           role:        String(u.role ?? 'member'),
-          base_type:   asBaseType(u.base_type ?? u.baseType),
+          base_type:   'farmer',
           grade:       asGrade(u.grade),
           status:      String(u.status ?? 'pending_leader'),
           is_leader:   caps.includes('is_leader'),
@@ -106,19 +109,41 @@ export default function MembersPage() {
 
   useEffect(() => { load() }, [load])
 
-  const rows2 = data as Record<string,unknown>[]
-  const total    = rows2.length
-  const approved = rows2.filter(x => x.status === 'approved').length
-  const pending  = rows2.filter(x => String(x.status ?? '').includes('pending')).length
-  const rejected = rows2.filter(x => x.status === 'rejected').length
+  const rowsAll = data as Record<string,unknown>[]
+  const farmerRows = rowsAll.filter(u => String(u.base_type ?? u.baseType ?? 'farmer') === 'farmer')
+  const total    = farmerRows.length
+  const approved = farmerRows.filter(x => x.status === 'approved').length
+  const pending  = farmerRows.filter(x => String(x.status ?? '').includes('pending')).length
+  const rejected = farmerRows.filter(x => x.status === 'rejected').length
 
-  const filtered = rows2.filter(u => {
+  const provinces = uniqueOptions(farmerRows, 'province')
+  const districts = uniqueOptions(farmerRows.filter(u => filterProvince === 'all' || String(u.province ?? '') === filterProvince), 'district')
+  const subdistricts = uniqueOptions(farmerRows.filter(u =>
+    (filterProvince === 'all' || String(u.province ?? '') === filterProvince) &&
+    (filterDistrict === 'all' || String(u.district ?? '') === filterDistrict)
+  ), 'subdistrict')
+
+  const filtered = farmerRows.filter(u => {
+    const caps = readCapabilities(u)
+    const isLeader = caps.includes('is_leader')
+    const canInspect = caps.includes('can_inspect') || Boolean(u.can_inspect)
     const matchSearch =
       String(u.full_name ?? '').includes(search) ||
       String(u.id_card   ?? '').includes(search) ||
-      String(u.phone     ?? '').includes(search)
-    const matchRole = filterRole === 'all' || u.role === filterRole || u.base_type === filterRole
-    return matchSearch && matchRole
+      String(u.phone     ?? '').includes(search) ||
+      String(u.province  ?? '').includes(search) ||
+      String(u.district  ?? '').includes(search) ||
+      String(u.subdistrict ?? '').includes(search)
+    const matchRole = filterRole === 'all' || u.role === filterRole
+    const matchProvince = filterProvince === 'all' || String(u.province ?? '') === filterProvince
+    const matchDistrict = filterDistrict === 'all' || String(u.district ?? '') === filterDistrict
+    const matchSubdistrict = filterSubdistrict === 'all' || String(u.subdistrict ?? '') === filterSubdistrict
+    const matchCapability =
+      filterCapability === 'all' ||
+      (filterCapability === 'leader' && isLeader) ||
+      (filterCapability === 'inspector' && canInspect) ||
+      (filterCapability === 'leader_inspector' && isLeader && canInspect)
+    return matchSearch && matchRole && matchProvince && matchDistrict && matchSubdistrict && matchCapability
   })
 
   const act = async (id:string, fn:()=>Promise<void>, msg:string) => {
@@ -138,12 +163,12 @@ export default function MembersPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">สมาชิก / อนุมัติสมาชิก</h1>
+          <h1 className="text-xl font-bold text-gray-900">สมาชิกเกษตรกร</h1>
           <div className="flex items-center gap-1.5 mt-0.5 text-sm">
             {isSupabaseReady
               ? <><Wifi className="w-3.5 h-3.5 text-emerald-600"/><span className="text-emerald-600">Supabase</span></>
               : <><WifiOff className="w-3.5 h-3.5 text-amber-500"/><span className="text-amber-600">Mock</span></>}
-            <span className="text-gray-400">• {total} รายการ</span>
+            <span className="text-gray-400">• แสดงเฉพาะ farmer • {total} รายการ</span>
           </div>
         </div>
         <button onClick={()=>{setLoading(true);load()}}
@@ -183,24 +208,40 @@ export default function MembersPage() {
         </div>
       )}
 
-      <div className="flex gap-2 flex-wrap">
-        <div className="relative flex-1 min-w-40">
+      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-2">
+        <div className="relative md:col-span-3 xl:col-span-2">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400"/>
-          <input placeholder="ค้นหา" value={search} onChange={e=>setSearch(e.target.value)}
+          <input placeholder="ค้นหา ชื่อ/บัตร/โทร/พื้นที่" value={search} onChange={e=>setSearch(e.target.value)}
             className="w-full pl-8 pr-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-emerald-500"/>
         </div>
-        <select value={filterRole} onChange={e=>setFilterRole(e.target.value)}
-          className="border-2 border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:border-emerald-500">
-          <option value="all">ทุกประเภท</option>
-          {[...roles, ...baseTypes].map(r=><option key={r}>{r}</option>)}
+        <select value={filterRole} onChange={e=>setFilterRole(e.target.value)} className="border-2 border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:border-emerald-500">
+          <option value="all">ทุก role</option>
+          {roles.map(r=><option key={r}>{r}</option>)}
+        </select>
+        <select value={filterCapability} onChange={e=>setFilterCapability(e.target.value as typeof filterCapability)} className="border-2 border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:border-emerald-500">
+          <option value="all">ทุกสิทธิ์</option>
+          <option value="leader">หัวหน้าทีม</option>
+          <option value="inspector">ผู้ตรวจ</option>
+          <option value="leader_inspector">หัวหน้า+ผู้ตรวจ</option>
+        </select>
+        <select value={filterProvince} onChange={e=>{setFilterProvince(e.target.value); setFilterDistrict('all'); setFilterSubdistrict('all')}} className="border-2 border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:border-emerald-500">
+          <option value="all">ทุกจังหวัด</option>
+          {provinces.map(p=><option key={p}>{p}</option>)}
+        </select>
+        <select value={filterDistrict} onChange={e=>{setFilterDistrict(e.target.value); setFilterSubdistrict('all')}} className="border-2 border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:border-emerald-500">
+          <option value="all">ทุกอำเภอ</option>
+          {districts.map(d=><option key={d}>{d}</option>)}
+        </select>
+        <select value={filterSubdistrict} onChange={e=>setFilterSubdistrict(e.target.value)} className="border-2 border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:border-emerald-500">
+          <option value="all">ทุกตำบล</option>
+          {subdistricts.map(s=><option key={s}>{s}</option>)}
         </select>
       </div>
 
       {filtered.length === 0 && !loading && (
         <div className="text-center py-16 text-gray-400">
           <div className="text-5xl mb-3">👥</div>
-          <p className="font-medium">ยังไม่มีสมาชิก</p>
-          <p className="text-xs mt-1 text-gray-300">เปิด console เพื่อ debug</p>
+          <p className="font-medium">ยังไม่มีสมาชิกเกษตรกร</p>
         </div>
       )}
 
@@ -213,7 +254,7 @@ export default function MembersPage() {
                   <th className="text-left px-4 py-3">ชื่อ</th>
                   <th className="text-left px-3 py-3">บัตรประชาชน</th>
                   <th className="text-left px-3 py-3">โทร</th>
-                  <th className="text-center px-3 py-3">Base</th>
+                  <th className="text-left px-3 py-3">ที่อยู่</th>
                   <th className="text-center px-3 py-3">Role</th>
                   <th className="text-center px-3 py-3">Grade</th>
                   <th className="text-center px-3 py-3">สิทธิ์</th>
@@ -226,7 +267,7 @@ export default function MembersPage() {
                   const id  = String(u.id)
                   const e   = edits[id] ?? {
                     role: String(u.role ?? 'member'),
-                    base_type: asBaseType(u.base_type),
+                    base_type: 'farmer' as BaseType,
                     grade: asGrade(u.grade),
                     status: String(u.status ?? 'pending_leader'),
                     is_leader: false,
@@ -254,12 +295,10 @@ export default function MembersPage() {
                       <td className="px-3 py-3">
                         <a href={`tel:${u.phone}`} className="text-blue-600 hover:underline font-mono text-xs whitespace-nowrap">{String(u.phone ?? '-')}</a>
                       </td>
-
-                      <td className="px-3 py-3 text-center">
-                        <select value={e.base_type} onChange={ev=>setEdit(id,{base_type:asBaseType(ev.target.value)})}
-                          className="border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:border-emerald-500">
-                          {baseTypes.map(b=><option key={b}>{b}</option>)}
-                        </select>
+                      <td className="px-3 py-3 text-xs text-gray-600 min-w-48">
+                        <div>{String(u.subdistrict ?? '-')} / {String(u.district ?? '-')}</div>
+                        <div>{String(u.province ?? '-')}</div>
+                        <div className="text-gray-400 truncate max-w-64">{String(u.address ?? u.village ?? '')}</div>
                       </td>
 
                       <td className="px-3 py-3 text-center">
@@ -279,20 +318,10 @@ export default function MembersPage() {
                       <td className="px-3 py-3 text-center">
                         <div className="flex flex-col gap-1 text-xs text-gray-600 whitespace-nowrap">
                           <label className="flex items-center justify-center gap-1 cursor-pointer select-none">
-                            <input
-                              type="checkbox"
-                              checked={Boolean(e.is_leader)}
-                              onChange={ev=>setEdit(id,{is_leader:ev.currentTarget.checked})}
-                            />
-                            หัวหน้า
+                            <input type="checkbox" checked={Boolean(e.is_leader)} onChange={ev=>setEdit(id,{is_leader:ev.currentTarget.checked})} /> หัวหน้า
                           </label>
                           <label className="flex items-center justify-center gap-1 cursor-pointer select-none">
-                            <input
-                              type="checkbox"
-                              checked={Boolean(e.can_inspect)}
-                              onChange={ev=>setEdit(id,{can_inspect:ev.currentTarget.checked})}
-                            />
-                            ตรวจ
+                            <input type="checkbox" checked={Boolean(e.can_inspect)} onChange={ev=>setEdit(id,{can_inspect:ev.currentTarget.checked})} /> ตรวจ
                           </label>
                         </div>
                       </td>
@@ -311,7 +340,7 @@ export default function MembersPage() {
                         <div className="flex items-center justify-center">
                           <button onClick={()=>act(id, ()=>updateMemberAdminFields(id,{
                               role:e.role,
-                              base_type:e.base_type,
+                              base_type:'farmer',
                               grade:e.grade,
                               status:e.status,
                               capabilities: makeCapabilities(e),
