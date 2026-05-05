@@ -8,42 +8,13 @@ import { useAuth } from './AuthContext'
 import { registerFarmerMember } from '../lib/db'
 import { isSupabaseReady } from '../lib/supabase'
 import { preprocessImageForOcr } from '../lib/imagePreprocess'
+import { runIdentityOcr, type IdentityOcrResult } from '../lib/identityOcr'
 
 const PROVINCES = ['บุรีรัมย์','สุรินทร์','ศรีสะเกษ','นครราชสีมา','ร้อยเอ็ด','อุบลราชธานี','ยโสธร','มุกดาหาร']
 const BANKS = ['ธนาคารกรุงไทย','ธนาคารออมสิน','ธ.ก.ส.','ธนาคารกรุงเทพ','ธนาคารไทยพาณิชย์','ธนาคารกสิกรไทย','ธนาคารกรุงศรีอยุธยา']
 
 function isThaiFullName(name: string) {
   return /^[ก-๙\s.]+$/.test(name.trim())
-}
-
-type IdentityOcrResult = {
-  full_name: string
-  id_card: string
-  address: string
-  province: string
-  district: string
-  subdistrict: string
-  expiry_date?: string
-  issue_date?: string
-  confidence: number
-  raw_text: string
-}
-
-async function runIdentityOcr(file: File): Promise<IdentityOcrResult> {
-  const processed = await preprocessImageForOcr(file, {
-    maxSide: 1200,
-    quality: 0.8,
-    centerCrop: true,
-  })
-
-  const res = await fetch('/api/ocr-documentai', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ imageBase64: processed.base64, mimeType: processed.file.type }),
-  })
-  const json = await res.json()
-  if (!res.ok) throw new Error(json.error ?? 'อ่านข้อความจากรูปไม่สำเร็จ')
-  return json as IdentityOcrResult
 }
 
 function Field({
@@ -95,6 +66,7 @@ export default function RegisterFlow() {
   const [fieldErr, setFieldErr] = useState<Record<string, string>>({})
   const [identityPhoto, setIdentityPhoto] = useState<File | null>(null)
   const [identityPhotoPreview, setIdentityPhotoPreview] = useState<string | null>(null)
+  const [identityOcr, setIdentityOcr] = useState<IdentityOcrResult | null>(null)
 
   const fillFormFromOcr = (ocr: IdentityOcrResult) => {
     const form = formRef.current
@@ -126,6 +98,7 @@ export default function RegisterFlow() {
     const file = e.target.files?.[0] ?? null
     setIdentityPhoto(file)
     setOcrWarning(null)
+    setIdentityOcr(null)
 
     if (file && fieldErr.identity_photo) {
       setFieldErr(prev => {
@@ -149,6 +122,7 @@ export default function RegisterFlow() {
       setIdentityPhoto(processed.file)
       setIdentityPhotoPreview(processed.dataUrl)
       const ocr = await runIdentityOcr(processed.file)
+      setIdentityOcr(ocr)
       fillFormFromOcr(ocr)
       console.info('[OCR result]', ocr)
     } catch (error) {
@@ -205,7 +179,12 @@ export default function RegisterFlow() {
 
     try {
       setStep('กำลังตรวจสอบข้อมูล...')
-      const res = await registerFarmerMember(values)
+      const res = await registerFarmerMember({
+        ...values,
+        identity_ocr_json: identityOcr,
+        identity_ocr_confidence: identityOcr?.confidence ?? null,
+        identity_ocr_raw_text: identityOcr?.raw_text ?? null,
+      })
       if (res.error && isSupabaseReady) throw new Error(res.error)
       setStep('สมัครสำเร็จ! ✓')
       if (res.data) {
