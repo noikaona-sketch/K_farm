@@ -8,6 +8,7 @@ import { useAuth, type RegStatus } from '../../routes/AuthContext'
 import { insertProfile, insertFarmer } from '../../lib/db'
 import { isSupabaseReady } from '../../lib/supabase'
 import { uploadFarmPhoto } from '../../lib/storage'
+import { preprocessImageForOcr } from '../../lib/imagePreprocess'
 
 function readExifCoords(file: File): Promise<{ lat: number; lng: number } | null> {
   return new Promise(resolve => {
@@ -82,20 +83,43 @@ export default function RegisterPage() {
 
   const handlePlotPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return
-    setPlotFile(file); setErr(null)
-    const reader = new FileReader()
-    reader.onload = ev => setPlotPreview(ev.target!.result as string)
-    reader.readAsDataURL(file)
+    setErr(null)
     const exif = await readExifCoords(file)
+    try {
+      const processed = await preprocessImageForOcr(file, {
+        centerCrop: false,
+        maxSide: 1280,
+        quality: 0.82,
+      })
+      setPlotFile(processed.file)
+      setPlotPreview(processed.dataUrl)
+    } catch (preprocessErr) {
+      console.warn('[RegisterPage] plot image preprocess failed:', preprocessErr)
+      setPlotFile(file)
+      const reader = new FileReader()
+      reader.onload = ev => setPlotPreview(ev.target!.result as string)
+      reader.readAsDataURL(file)
+      setErr('ย่อรูปแปลงไม่สำเร็จ ระบบจะใช้รูปต้นฉบับแทน')
+    }
     if (exif) { setCoords(exif); setGpsSource('exif') } else requestGPS()
   }
 
   const handleOcrPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return
     setOcrLoading(true); setErr(null)
-    const reader = new FileReader()
-    reader.onload = ev => setOcrPreview(ev.target!.result as string)
-    reader.readAsDataURL(file)
+    try {
+      const processed = await preprocessImageForOcr(file, {
+        centerCrop: true,
+        maxSide: 1200,
+        quality: 0.8,
+      })
+      setOcrPreview(processed.dataUrl)
+    } catch (preprocessErr) {
+      console.warn('[RegisterPage] OCR image preprocess failed:', preprocessErr)
+      const reader = new FileReader()
+      reader.onload = ev => setOcrPreview(ev.target!.result as string)
+      reader.readAsDataURL(file)
+    }
     await new Promise(r => setTimeout(r, 1200))
     setOcrLoading(false); setStep(3)
   }
