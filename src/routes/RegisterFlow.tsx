@@ -12,6 +12,10 @@ import { preprocessImageForOcr } from '../lib/imagePreprocess'
 const PROVINCES = ['บุรีรัมย์','สุรินทร์','ศรีสะเกษ','นครราชสีมา','ร้อยเอ็ด','อุบลราชธานี','ยโสธร','มุกดาหาร']
 const BANKS = ['ธนาคารกรุงไทย','ธนาคารออมสิน','ธ.ก.ส.','ธนาคารกรุงเทพ','ธนาคารไทยพาณิชย์','ธนาคารกสิกรไทย','ธนาคารกรุงศรีอยุธยา']
 
+function isThaiFullName(name: string) {
+  return /^[ก-๙\s.]+$/.test(name.trim())
+}
+
 type IdentityOcrResult = {
   full_name: string
   id_card: string
@@ -175,6 +179,7 @@ export default function RegisterFlow() {
   const validate = (v: ReturnType<typeof getValues>): Record<string, string> => {
     const e: Record<string, string> = {}
     if (!v.full_name)                      e.full_name         = 'กรุณากรอกชื่อ-นามสกุล'
+    else if (!isThaiFullName(v.full_name)) e.full_name         = 'กรุณากรอกชื่อ-นามสกุลเป็นภาษาไทย'
     if (v.id_card.length !== 13)           e.id_card           = 'เลขบัตรประชาชน 13 หลัก'
     if (v.phone.length < 9)                e.phone             = 'กรุณากรอกเบอร์โทรให้ถูกต้อง'
     if (!v.district)                       e.district          = 'กรุณากรอกอำเภอ'
@@ -273,7 +278,7 @@ export default function RegisterFlow() {
             <User className="w-5 h-5 text-emerald-600" />
             <h2 className="font-bold text-gray-800">ข้อมูลส่วนตัว</h2>
           </div>
-          <Field label="ชื่อ-นามสกุล *" name="full_name" placeholder="กรอกชื่อ-นามสกุล"
+          <Field label="ชื่อ-นามสกุล *" name="full_name" placeholder="กรอกชื่อ-นามสกุลภาษาไทย"
             icon={User} errMsg={fieldErr.full_name} />
           <Field label="เลขบัตรประชาชน * (Username)" name="id_card"
             placeholder="1-xxxx-xxxxx-xx-x" inputMode="numeric" icon={CreditCard}
