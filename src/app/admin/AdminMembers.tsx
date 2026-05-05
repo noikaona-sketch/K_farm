@@ -6,18 +6,38 @@ import {
 import { isSupabaseReady } from '../../lib/supabase'
 import { RefreshCw, Search, Wifi, WifiOff } from 'lucide-react'
 
-const roles    = ['member','farmer','leader','inspector','service_provider','admin']
-const grades   = ['C','B','A','VIP','Premium']
-const statuses = ['pending_leader','pending_admin','approved','rejected']
+const roles     = ['member','farmer','leader','inspector','service','vehicle','admin']
+const baseTypes = ['farmer','service','staff']
+const grades    = ['C','B','A']
+const statuses  = ['pending_leader','pending_admin','approved','rejected','suspended']
 
 const STATUS_DOT: Record<string, string> = {
   pending_leader: 'bg-amber-400',
   pending_admin:  'bg-orange-400',
   approved:       'bg-emerald-500',
   rejected:       'bg-red-400',
+  suspended:      'bg-gray-400',
 }
 
-interface RowEdit { role: string; grade: string; status: string }
+interface RowEdit {
+  role: string
+  base_type: string
+  grade: string
+  status: string
+  is_leader: boolean
+  can_inspect: boolean
+}
+
+function readCapabilities(u: Record<string, unknown>): string[] {
+  return Array.isArray(u.capabilities) ? u.capabilities.map(String) : []
+}
+
+function makeCapabilities(e: RowEdit): string[] {
+  return [
+    e.is_leader ? 'is_leader' : null,
+    e.can_inspect ? 'can_inspect' : null,
+  ].filter(Boolean) as string[]
+}
 
 export default function MembersPage() {
   const [data, setData]       = useState<unknown[]>([])
@@ -39,15 +59,18 @@ export default function MembersPage() {
     setLoading(true)
     try {
       const res = await fetchAdminMembers()
-      console.log('[AdminMembers] data:', res)  // debug
+      console.log('[AdminMembers] data:', res)
       setData(res as unknown[])
-      // seed edit state
       const init: Record<string,RowEdit> = {}
       ;(res as unknown as Record<string,unknown>[]).forEach((u) => {
+        const caps = readCapabilities(u)
         init[u.id as string] = {
-          role:   String(u.role   ?? 'member'),
-          grade:  String(u.grade  ?? 'C'),
-          status: String(u.status ?? 'pending_leader'),
+          role:        String(u.role ?? 'member'),
+          base_type:   String(u.base_type ?? u.baseType ?? 'farmer'),
+          grade:       String(u.grade ?? 'C'),
+          status:      String(u.status ?? 'pending_leader'),
+          is_leader:   caps.includes('is_leader'),
+          can_inspect: caps.includes('can_inspect') || Boolean(u.can_inspect),
         }
       })
       setEdits(init)
@@ -61,20 +84,18 @@ export default function MembersPage() {
 
   useEffect(() => { load() }, [load])
 
-  // summary — ใช้ u.status ตรงๆ (ไม่ผ่าน farmers)
   const rows2 = data as Record<string,unknown>[]
   const total    = rows2.length
   const approved = rows2.filter(x => x.status === 'approved').length
   const pending  = rows2.filter(x => String(x.status ?? '').includes('pending')).length
   const rejected = rows2.filter(x => x.status === 'rejected').length
 
-  // filter + search
   const filtered = rows2.filter(u => {
     const matchSearch =
       String(u.full_name ?? '').includes(search) ||
       String(u.id_card   ?? '').includes(search) ||
       String(u.phone     ?? '').includes(search)
-    const matchRole = filterRole === 'all' || u.role === filterRole
+    const matchRole = filterRole === 'all' || u.role === filterRole || u.base_type === filterRole
     return matchSearch && matchRole
   })
 
@@ -93,8 +114,6 @@ export default function MembersPage() {
 
   return (
     <div className="space-y-4">
-
-      {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900">สมาชิก / อนุมัติสมาชิก</h1>
@@ -111,7 +130,6 @@ export default function MembersPage() {
         </button>
       </div>
 
-      {/* Toast */}
       {toast && (
         <div className={`rounded-xl px-4 py-3 flex items-center gap-2 text-sm font-medium border
           ${toast.ok
@@ -122,7 +140,6 @@ export default function MembersPage() {
         </div>
       )}
 
-      {/* Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           {l:'ทั้งหมด',   n:total,    bg:'bg-gray-50    border-gray-200   text-gray-700'},
@@ -137,7 +154,6 @@ export default function MembersPage() {
         ))}
       </div>
 
-      {/* Pending alert */}
       {pending > 0 && (
         <div className="flex items-center gap-3 bg-red-50 border-2 border-red-300 rounded-2xl px-4 py-3">
           <span className="w-8 h-8 rounded-full bg-red-500 text-white font-bold text-sm flex items-center justify-center flex-shrink-0">{pending}</span>
@@ -145,7 +161,6 @@ export default function MembersPage() {
         </div>
       )}
 
-      {/* Filter + Search */}
       <div className="flex gap-2 flex-wrap">
         <div className="relative flex-1 min-w-40">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400"/>
@@ -154,12 +169,11 @@ export default function MembersPage() {
         </div>
         <select value={filterRole} onChange={e=>setFilterRole(e.target.value)}
           className="border-2 border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:border-emerald-500">
-          <option value="all">ทุก role</option>
-          {roles.map(r=><option key={r}>{r}</option>)}
+          <option value="all">ทุกประเภท</option>
+          {[...roles, ...baseTypes].map(r=><option key={r}>{r}</option>)}
         </select>
       </div>
 
-      {/* Empty */}
       {filtered.length === 0 && !loading && (
         <div className="text-center py-16 text-gray-400">
           <div className="text-5xl mb-3">👥</div>
@@ -168,7 +182,6 @@ export default function MembersPage() {
         </div>
       )}
 
-      {/* Table */}
       {filtered.length > 0 && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="overflow-x-auto">
@@ -178,8 +191,10 @@ export default function MembersPage() {
                   <th className="text-left px-4 py-3">ชื่อ</th>
                   <th className="text-left px-3 py-3">บัตรประชาชน</th>
                   <th className="text-left px-3 py-3">โทร</th>
+                  <th className="text-center px-3 py-3">Base</th>
                   <th className="text-center px-3 py-3">Role</th>
                   <th className="text-center px-3 py-3">Grade</th>
+                  <th className="text-center px-3 py-3">สิทธิ์</th>
                   <th className="text-center px-3 py-3">Status</th>
                   <th className="text-center px-4 py-3">Action</th>
                 </tr>
@@ -187,7 +202,14 @@ export default function MembersPage() {
               <tbody className="divide-y divide-gray-50">
                 {filtered.map(u => {
                   const id  = String(u.id)
-                  const e   = edits[id] ?? { role: String(u.role ?? 'member'), grade: String(u.grade ?? 'C'), status: String(u.status ?? 'pending_leader') }
+                  const e   = edits[id] ?? {
+                    role: String(u.role ?? 'member'),
+                    base_type: String(u.base_type ?? 'farmer'),
+                    grade: String(u.grade ?? 'C'),
+                    status: String(u.status ?? 'pending_leader'),
+                    is_leader: false,
+                    can_inspect: false,
+                  }
                   const isA = acting === id
                   const dot = STATUS_DOT[e.status] ?? 'bg-gray-300'
 
@@ -211,7 +233,13 @@ export default function MembersPage() {
                         <a href={`tel:${u.phone}`} className="text-blue-600 hover:underline font-mono text-xs whitespace-nowrap">{String(u.phone ?? '-')}</a>
                       </td>
 
-                      {/* ROLE */}
+                      <td className="px-3 py-3 text-center">
+                        <select value={e.base_type} onChange={ev=>setEdit(id,{base_type:ev.target.value})}
+                          className="border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:border-emerald-500">
+                          {baseTypes.map(b=><option key={b}>{b}</option>)}
+                        </select>
+                      </td>
+
                       <td className="px-3 py-3 text-center">
                         <select value={e.role} onChange={ev=>setEdit(id,{role:ev.target.value})}
                           className="border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:border-emerald-500">
@@ -219,16 +247,24 @@ export default function MembersPage() {
                         </select>
                       </td>
 
-                      {/* GRADE */}
                       <td className="px-3 py-3 text-center">
                         <select value={e.grade} onChange={ev=>setEdit(id,{grade:ev.target.value})}
                           className="border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:border-emerald-500 w-20">
-                          <option value="">-</option>
                           {grades.map(g=><option key={g}>{g}</option>)}
                         </select>
                       </td>
 
-                      {/* STATUS */}
+                      <td className="px-3 py-3 text-center">
+                        <div className="flex flex-col gap-1 text-xs text-gray-600 whitespace-nowrap">
+                          <label className="flex items-center justify-center gap-1">
+                            <input type="checkbox" checked={e.is_leader} onChange={ev=>setEdit(id,{is_leader:ev.target.checked})} /> หัวหน้า
+                          </label>
+                          <label className="flex items-center justify-center gap-1">
+                            <input type="checkbox" checked={e.can_inspect} onChange={ev=>setEdit(id,{can_inspect:ev.target.checked})} /> ตรวจ
+                          </label>
+                        </div>
+                      </td>
+
                       <td className="px-3 py-3 text-center">
                         <div className="flex items-center justify-center gap-1.5">
                           <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${dot}`}/>
@@ -239,35 +275,48 @@ export default function MembersPage() {
                         </div>
                       </td>
 
-                      {/* ACTIONS */}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1.5 justify-center flex-wrap">
-                          {/* 💾 save role+grade+status */}
-                          <button onClick={()=>act(id, ()=>updateMemberAdminFields(id,{role:e.role,grade:e.grade,status:e.status}), `💾 บันทึก`)}
+                          <button onClick={()=>act(id, ()=>updateMemberAdminFields(id,{
+                              role:e.role,
+                              base_type:e.base_type,
+                              grade:e.grade,
+                              status:e.status,
+                              capabilities: makeCapabilities(e),
+                            }), `💾 บันทึก`)}
                             disabled={isA}
                             className={`px-2.5 h-7 rounded-lg text-xs font-bold transition-colors ${isA?'bg-blue-100 text-blue-300 cursor-wait':'bg-blue-500 text-white hover:bg-blue-600'}`}>
                             {isA?'…':'💾'}
                           </button>
-                          {/* ✔ approve */}
                           <button onClick={()=>act(id, ()=>approveMember(id), `✅ อนุมัติ`)}
                             disabled={isA||e.status==='approved'}
                             className={`w-7 h-7 rounded-lg text-sm font-bold transition-colors
                               ${e.status==='approved'?'bg-gray-100 text-gray-300 cursor-not-allowed':isA?'bg-emerald-100 text-emerald-300 cursor-wait':'bg-emerald-500 text-white hover:bg-emerald-600'}`}>
                             ✔
                           </button>
-                          {/* ✖ reject */}
                           <button onClick={()=>act(id, ()=>rejectMember(id), `❌ ปฏิเสธ`)}
                             disabled={isA||e.status==='rejected'}
                             className={`w-7 h-7 rounded-lg text-sm font-bold transition-colors
                               ${e.status==='rejected'?'bg-gray-100 text-gray-300 cursor-not-allowed':isA?'bg-red-100 text-red-300 cursor-wait':'bg-red-500 text-white hover:bg-red-600'}`}>
                             ✖
                           </button>
-                          {/* 👑 leader quick action */}
-                          <button onClick={()=>act(id, ()=>updateMemberAdminFields(id,{role:'leader',grade:'A',status:'approved'}), `👑 ตั้งหัวหน้า`)}
+                          <button onClick={()=>act(id, ()=>updateMemberAdminFields(id,{role:'leader',base_type:'farmer',grade:'A',status:'approved',capabilities:['is_leader']}), `👑 ตั้งหัวหน้า`)}
                             disabled={isA}
                             title="ตั้งหัวหน้ากลุ่ม"
                             className={`px-2.5 h-7 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${isA?'bg-amber-100 text-amber-300 cursor-wait':'bg-amber-500 text-white hover:bg-amber-600'}`}>
                             👑
+                          </button>
+                          <button onClick={()=>act(id, ()=>updateMemberAdminFields(id,{role:'inspector',status:'approved',capabilities:['can_inspect']}), `🔍 ตั้งผู้ตรวจ`)}
+                            disabled={isA}
+                            title="ตั้งผู้ตรวจ"
+                            className={`px-2.5 h-7 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${isA?'bg-blue-100 text-blue-300 cursor-wait':'bg-blue-500 text-white hover:bg-blue-600'}`}>
+                            🔍
+                          </button>
+                          <button onClick={()=>act(id, ()=>updateMemberAdminFields(id,{role:'service',base_type:'service',grade:'C',status:'approved',capabilities:[]}), `🚜 ตั้งรถร่วม`)}
+                            disabled={isA}
+                            title="ตั้งเป็นรถร่วม"
+                            className={`px-2.5 h-7 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${isA?'bg-orange-100 text-orange-300 cursor-wait':'bg-orange-500 text-white hover:bg-orange-600'}`}>
+                            🚜
                           </button>
                         </div>
                       </td>
