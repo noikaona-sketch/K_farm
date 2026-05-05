@@ -39,6 +39,17 @@ function asGrade(value: unknown): Grade {
   return value === 'A' || value === 'B' ? value : 'C'
 }
 
+function defaultEdit(): RowEdit {
+  return {
+    role: 'member',
+    base_type: 'farmer',
+    grade: 'C',
+    status: 'pending_leader',
+    is_leader: false,
+    can_inspect: false,
+  }
+}
+
 function readCapabilities(u: Record<string, unknown>): string[] {
   return Array.isArray(u.capabilities) ? u.capabilities.map(String) : []
 }
@@ -64,7 +75,7 @@ export default function MembersPage() {
   }
 
   const setEdit = (id: string, patch: Partial<RowEdit>) =>
-    setEdits(prev => ({...prev, [id]: {...prev[id], ...patch}}))
+    setEdits(prev => ({...prev, [id]: {...(prev[id] ?? defaultEdit()), ...patch}}))
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -267,11 +278,21 @@ export default function MembersPage() {
 
                       <td className="px-3 py-3 text-center">
                         <div className="flex flex-col gap-1 text-xs text-gray-600 whitespace-nowrap">
-                          <label className="flex items-center justify-center gap-1">
-                            <input type="checkbox" checked={e.is_leader} onChange={ev=>setEdit(id,{is_leader:ev.target.checked})} /> หัวหน้า
+                          <label className="flex items-center justify-center gap-1 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(e.is_leader)}
+                              onChange={ev=>setEdit(id,{is_leader:ev.currentTarget.checked})}
+                            />
+                            หัวหน้า
                           </label>
-                          <label className="flex items-center justify-center gap-1">
-                            <input type="checkbox" checked={e.can_inspect} onChange={ev=>setEdit(id,{can_inspect:ev.target.checked})} /> ตรวจ
+                          <label className="flex items-center justify-center gap-1 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(e.can_inspect)}
+                              onChange={ev=>setEdit(id,{can_inspect:ev.currentTarget.checked})}
+                            />
+                            ตรวจ
                           </label>
                         </div>
                       </td>
@@ -311,11 +332,11 @@ export default function MembersPage() {
                               ${e.status==='rejected'?'bg-gray-100 text-gray-300 cursor-not-allowed':isA?'bg-red-100 text-red-300 cursor-wait':'bg-red-500 text-white hover:bg-red-600'}`}>
                             ✖
                           </button>
-                          <button onClick={()=>act(id, ()=>updateMemberAdminFields(id,{role:'leader',base_type:'farmer',grade:'A',status:'approved',capabilities:['is_leader']}), `👑 ตั้งหัวหน้า`)}
+                          <button onClick={()=>act(id, ()=>updateMemberAdminFields(id,{role:'leader',base_type:'farmer',grade:'A',status:'approved',capabilities:['is_leader','can_inspect']}), `👑 ตั้งหัวหน้า+ผู้ตรวจ`)}
                             disabled={isA}
-                            title="ตั้งหัวหน้ากลุ่ม"
+                            title="ตั้งหัวหน้ากลุ่มและผู้ตรวจ"
                             className={`px-2.5 h-7 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${isA?'bg-amber-100 text-amber-300 cursor-wait':'bg-amber-500 text-white hover:bg-amber-600'}`}>
-                            👑
+                            👑🔍
                           </button>
                           <button onClick={()=>act(id, ()=>updateMemberAdminFields(id,{role:'inspector',status:'approved',capabilities:['can_inspect']}), `🔍 ตั้งผู้ตรวจ`)}
                             disabled={isA}
