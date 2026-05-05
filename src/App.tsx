@@ -61,6 +61,8 @@ import AdminPlaceholderPage  from './app/admin/AdminPlaceholderPage'
 const ROLE_HOME: Record<AppRole, string> = {
   member:    '/farmer',
   farmer:    '/farmer',
+  vehicle:   '/service',
+  service:   '/service',
   field:     '/field',
   leader:    '/leader',
   inspector: '/inspector',
@@ -68,28 +70,28 @@ const ROLE_HOME: Record<AppRole, string> = {
 }
 
 function RequireAuth({ minRole = 'member', children }: { minRole?: AppRole; children: React.ReactNode }) {
-  const { user } = useAuth()
+  const { user, homePath } = useAuth()
   if (!user) return <Navigate to="/login" replace />
-  if (!atLeast(user.role ?? 'member', minRole)) return <Navigate to={ROLE_HOME[user.role ?? 'member']} replace />
+  if (!atLeast(user.role ?? 'member', minRole)) return <Navigate to={homePath || ROLE_HOME[user.role ?? 'member']} replace />
   return <>{children}</>
 }
 
 function RedirectIfAuthed({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth()
-  if (user) return <Navigate to={ROLE_HOME[user.role ?? 'member']} replace />
+  const { user, homePath } = useAuth()
+  if (user) return <Navigate to={homePath || ROLE_HOME[user.role ?? 'member']} replace />
   return <>{children}</>
 }
 
 function LiffGuard({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth()
+  const { user, homePath } = useAuth()
   useEffect(() => {
     const isInsideLine = /Line/i.test(navigator.userAgent)
     if (isInsideLine && user && user.role === 'admin') window.location.href = '/admin'
     if (isInsideLine && !user) return
     if (isInsideLine && user?.role !== 'admin') {
-      if (!window.location.pathname.startsWith('/farmer') && !window.location.pathname.startsWith('/field') && !window.location.pathname.startsWith('/leader') && !window.location.pathname.startsWith('/inspector')) window.location.href = ROLE_HOME[user?.role ?? 'farmer'] ?? '/farmer'
+      if (!window.location.pathname.startsWith('/farmer') && !window.location.pathname.startsWith('/field') && !window.location.pathname.startsWith('/leader') && !window.location.pathname.startsWith('/inspector') && !window.location.pathname.startsWith('/service')) window.location.href = homePath || ROLE_HOME[user?.role ?? 'farmer'] ?? '/farmer'
     }
-  }, [user])
+  }, [user, homePath])
   return <>{children}</>
 }
 
@@ -161,6 +163,10 @@ function FieldDashboardHome() {
   )
 }
 
+function ServiceHome() {
+  return <AdminPlaceholderPage title="รถร่วม" icon="🚜" items={["โปรไฟล์รถ + เกรด", "ตารางนัดงาน", "ประวัติรายรับ"]} />
+}
+
 export default function App() {
   return (
     <AuthProvider><LiffGuard><Routes>
@@ -185,6 +191,13 @@ export default function App() {
         <Route path="farms" element={<RequireAuth minRole="farmer"><MyFarms /></RequireAuth>} />
         <Route path="farms/add" element={<RequireAuth minRole="farmer"><AddFarm /></RequireAuth>} />
         <Route path="planting" element={<RequireAuth minRole="farmer"><PlantingRecord /></RequireAuth>} />
+      </Route>
+
+      <Route path="/service" element={<RequireAuth minRole="vehicle"><MobileLayout /></RequireAuth>}>
+        <Route index element={<ServiceHome />} />
+        <Route path="schedule" element={<AdminPlaceholderPage title="ตารางนัดงาน" icon="📅" />} />
+        <Route path="income" element={<AdminPlaceholderPage title="ประวัติรายรับ" icon="💰" />} />
+        <Route path="team" element={<AdminPlaceholderPage title="รถในทีม" icon="👥" />} />
       </Route>
 
       <Route path="/field" element={<RequireAuth minRole="field"><MobileLayout /></RequireAuth>}>
