@@ -46,7 +46,6 @@ async function runIdentityOcr(file: File): Promise<IdentityOcrResult> {
   return json as IdentityOcrResult
 }
 
-// ── Uncontrolled text input — zero re-render while typing ─────────────────────
 function Field({
   label, name, placeholder, inputMode = 'text', note, icon: Icon, errMsg, defaultValue = '',
 }: {
@@ -93,6 +92,7 @@ export default function RegisterFlow() {
   const [saving, setSaving] = useState(false)
   const [step, setStep] = useState('')
   const [err, setErr] = useState<string | null>(null)
+  const [ocrWarning, setOcrWarning] = useState<string | null>(null)
   const [fieldErr, setFieldErr] = useState<Record<string, string>>({})
   const [identityPhoto, setIdentityPhoto] = useState<File | null>(null)
   const [identityPhotoPreview, setIdentityPhotoPreview] = useState<string | null>(null)
@@ -115,6 +115,7 @@ export default function RegisterFlow() {
   const handleIdentityPhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null
     setIdentityPhoto(file)
+    setOcrWarning(null)
     setIdentityPhotoPreview(prev => {
       if (prev) URL.revokeObjectURL(prev)
       return file ? URL.createObjectURL(file) : null
@@ -131,14 +132,13 @@ export default function RegisterFlow() {
     if (!file) return
 
     try {
-      setErr(null)
       setStep('กำลังอ่านข้อความจากรูป...')
       const ocr = await runIdentityOcr(file)
       fillFormFromOcr(ocr)
       console.info('[OCR result]', ocr)
     } catch (error) {
-      console.error('[OCR]', error)
-      setErr(error instanceof Error ? error.message : 'อ่านข้อความจากรูปไม่สำเร็จ')
+      console.warn('[OCR skipped]', error)
+      setOcrWarning('อ่านข้อความจากรูปไม่สำเร็จ กรุณากรอกข้อมูลเอง แล้วยังสมัครต่อได้')
     } finally {
       setStep('')
     }
@@ -239,6 +239,12 @@ export default function RegisterFlow() {
           </div>
         </div>
 
+        {ocrWarning && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-700">
+            {ocrWarning}
+          </div>
+        )}
+
         {err && (
           <div className="bg-red-50 border-2 border-red-300 rounded-2xl p-4 flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
@@ -278,7 +284,7 @@ export default function RegisterFlow() {
                 ${fieldErr.identity_photo ? 'border-red-400 bg-red-50' : 'border-gray-200 focus:border-emerald-500'}`}
             />
             {fieldErr.identity_photo && <p className="text-red-500 text-xs mt-1 ml-1">{fieldErr.identity_photo}</p>}
-            {!fieldErr.identity_photo && <p className="text-gray-400 text-xs mt-1 ml-1">ถ่ายหรือแนบรูปให้ชัดเจน ระบบจะพยายามอ่านข้อมูลให้อัตโนมัติ</p>}
+            {!fieldErr.identity_photo && <p className="text-gray-400 text-xs mt-1 ml-1">ถ่ายหรือแนบรูปให้ชัดเจน ระบบจะพยายามอ่านข้อมูลให้อัตโนมัติ ถ้าไม่สำเร็จสามารถกรอกเองได้</p>}
             {identityPhotoPreview && (
               <img
                 src={identityPhotoPreview}
