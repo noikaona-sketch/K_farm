@@ -18,6 +18,8 @@ type IdentityOcrResult = {
   province: string
   district: string
   subdistrict: string
+  expiry_date?: string
+  issue_date?: string
   confidence: number
   raw_text: string
 }
@@ -102,12 +104,23 @@ export default function RegisterFlow() {
     const fullNameInput = form.querySelector<HTMLInputElement>('[name="full_name"]')
     const idCardInput = form.querySelector<HTMLInputElement>('[name="id_card"]')
     const districtInput = form.querySelector<HTMLInputElement>('[name="district"]')
+    const subdistrictInput = form.querySelector<HTMLInputElement>('[name="subdistrict"]')
     const villageInput = form.querySelector<HTMLInputElement>('[name="village"]')
+    const bankAccountNameInput = form.querySelector<HTMLInputElement>('[name="bank_account_name"]')
 
-    if (ocr.full_name && fullNameInput && !fullNameInput.value) fullNameInput.value = ocr.full_name
-    if (ocr.id_card && idCardInput && !idCardInput.value) idCardInput.value = ocr.id_card
-    if (ocr.district && districtInput && !districtInput.value) districtInput.value = ocr.district
-    if (ocr.address && villageInput && !villageInput.value) villageInput.value = ocr.address
+    const currentId = idCardInput?.value?.replace(/[-\s]/g, '').trim() ?? ''
+    if (ocr.id_card && currentId && currentId !== ocr.id_card) {
+      setOcrWarning(`เลขบัตรที่อ่านได้ (${ocr.id_card}) ไม่ตรงกับเลขที่กรอกไว้ กรุณาตรวจสอบ`)
+    }
+
+    if (ocr.full_name && fullNameInput) {
+      fullNameInput.value = ocr.full_name
+      if (bankAccountNameInput) bankAccountNameInput.value = ocr.full_name
+    }
+    if (ocr.id_card && idCardInput) idCardInput.value = ocr.id_card
+    if (ocr.district && districtInput) districtInput.value = ocr.district
+    if (ocr.subdistrict && subdistrictInput) subdistrictInput.value = ocr.subdistrict
+    if (ocr.address && villageInput) villageInput.value = ocr.address
     if (ocr.province) setProvince(ocr.province)
   }
 
@@ -149,6 +162,7 @@ export default function RegisterFlow() {
       id_card:           (fd.get('id_card')            as string ?? '').replace(/[-\s]/g, '').trim(),
       phone:             (fd.get('phone')              as string ?? '').replace(/[-\s]/g, '').trim(),
       district:          (fd.get('district')           as string ?? '').trim(),
+      subdistrict:       (fd.get('subdistrict')        as string ?? '').trim(),
       village:           (fd.get('village')            as string ?? '').trim(),
       bank_account_no:   (fd.get('bank_account_no')   as string ?? '').trim(),
       bank_account_name: (fd.get('bank_account_name') as string ?? '').trim(),
@@ -163,8 +177,9 @@ export default function RegisterFlow() {
     if (v.id_card.length !== 13)           e.id_card           = 'เลขบัตรประชาชน 13 หลัก'
     if (v.phone.length < 9)                e.phone             = 'กรุณากรอกเบอร์โทรให้ถูกต้อง'
     if (!v.district)                       e.district          = 'กรุณากรอกอำเภอ'
+    if (!v.subdistrict)                    e.subdistrict       = 'กรุณากรอกตำบล'
     if (!v.bank_account_no)                e.bank_account_no   = 'กรุณากรอกเลขบัญชี'
-    if (!v.bank_account_name)              e.bank_account_name = 'กรุณากรอกชื่อบัญชี'
+    if (v.bank_account_name !== v.full_name) e.bank_account_name = 'ชื่อบัญชีต้องตรงกับชื่อผู้สมัคร'
     if (!identityPhoto)                    e.identity_photo    = 'กรุณาแนบรูปเอกสารยืนยันตัวตน'
     return e
   }
@@ -305,7 +320,8 @@ export default function RegisterFlow() {
             </select>
           </div>
           <Field label="อำเภอ *" name="district" placeholder="กรอกอำเภอ" errMsg={fieldErr.district} />
-          <Field label="หมู่บ้าน / ตำบล" name="village" placeholder="เช่น บ้านดง ต.นาดี" />
+          <Field label="ตำบล *" name="subdistrict" placeholder="กรอกตำบล" errMsg={fieldErr.subdistrict} />
+          <Field label="ที่อยู่ / หมู่บ้าน" name="village" placeholder="เช่น 420/43 หมู่ที่ 12" />
         </div>
 
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5 space-y-4">
@@ -321,7 +337,7 @@ export default function RegisterFlow() {
             </select>
           </div>
           <Field label="เลขบัญชี *" name="bank_account_no" placeholder="xxx-x-xxxxx-x" inputMode="numeric" note="ไม่ต้องใส่เครื่องหมาย -" errMsg={fieldErr.bank_account_no} />
-          <Field label="ชื่อบัญชี *" name="bank_account_name" placeholder="ชื่อ-นามสกุล ตามสมุดบัญชี" errMsg={fieldErr.bank_account_name} />
+          <Field label="ชื่อบัญชี *" name="bank_account_name" placeholder="ต้องตรงกับชื่อผู้สมัคร" errMsg={fieldErr.bank_account_name} />
         </div>
 
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-700 leading-relaxed">
