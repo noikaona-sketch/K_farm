@@ -987,33 +987,58 @@ export interface MemberAdminFields {
   status?: string
 }
 
+export interface MemberAdminFields {
+  role?: string
+  base_type?: 'farmer' | 'service' | 'staff'
+  grade?: 'A' | 'B' | 'C' | string
+  status?: string
+  capabilities?: string[]
+}
+
 export async function updateMemberAdminFields(
   id: string,
   payload: MemberAdminFields
 ): Promise<void> {
-  const { role, grade, status } = payload
+  const { role, grade, status, base_type, capabilities } = payload
 
   if (!supabase) {
     console.info('[mock] updateMemberAdminFields', id, payload)
     return
   }
 
-  if (role !== undefined || grade !== undefined) {
+  const profilePatch: Record<string, unknown> = {}
+
+  if (role !== undefined) profilePatch.role = role
+  if (grade !== undefined) profilePatch.grade = grade
+  if (base_type !== undefined) profilePatch.base_type = base_type
+  if (capabilities !== undefined) profilePatch.capabilities = capabilities
+
+  if (Object.keys(profilePatch).length > 0) {
     const { error } = await supabase
       .from('profiles')
-      .update({ role, grade })
+      .update(profilePatch)
       .eq('id', id)
+
     if (error) {
       logSupabaseError('updateMemberAdminFields:profiles', error)
       throw new Error(error.message)
     }
   }
 
-  if (status !== undefined) {
+  const farmerPatch: Record<string, unknown> = {}
+
+  if (status !== undefined) farmerPatch.status = status
+  if (grade !== undefined) farmerPatch.grade = grade
+  if (capabilities !== undefined) {
+    farmerPatch.can_inspect = capabilities.includes('can_inspect')
+  }
+
+  if (Object.keys(farmerPatch).length > 0) {
     const { error } = await supabase
       .from('farmers')
-      .update({ status, member_status: status })
+      .update(farmerPatch)
       .eq('profile_id', id)
+
     if (error) {
       logSupabaseError('updateMemberAdminFields:farmers', error)
       throw new Error(error.message)
