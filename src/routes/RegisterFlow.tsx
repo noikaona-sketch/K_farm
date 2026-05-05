@@ -7,6 +7,7 @@ import {
 import { useAuth } from './AuthContext'
 import { registerFarmerMember } from '../lib/db'
 import { isSupabaseReady } from '../lib/supabase'
+import { preprocessImageForOcr } from '../lib/imagePreprocess'
 
 const PROVINCES = ['บุรีรัมย์','สุรินทร์','ศรีสะเกษ','นครราชสีมา','ร้อยเอ็ด','อุบลราชธานี','ยโสธร','มุกดาหาร']
 const BANKS = ['ธนาคารกรุงไทย','ธนาคารออมสิน','ธ.ก.ส.','ธนาคารกรุงเทพ','ธนาคารไทยพาณิชย์','ธนาคารกสิกรไทย','ธนาคารกรุงศรีอยุธยา']
@@ -24,24 +25,17 @@ type IdentityOcrResult = {
   raw_text: string
 }
 
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      const result = String(reader.result ?? '')
-      resolve(result.split(',')[1] ?? '')
-    }
-    reader.onerror = () => reject(reader.error)
-    reader.readAsDataURL(file)
-  })
-}
-
 async function runIdentityOcr(file: File): Promise<IdentityOcrResult> {
-  const imageBase64 = await fileToBase64(file)
+  const processed = await preprocessImageForOcr(file, {
+    maxSide: 1200,
+    quality: 0.8,
+    centerCrop: true,
+  })
+
   const res = await fetch('/api/ocr-documentai', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ imageBase64, mimeType: file.type || 'image/jpeg' }),
+    body: JSON.stringify({ imageBase64: processed.base64, mimeType: processed.file.type }),
   })
   const json = await res.json()
   if (!res.ok) throw new Error(json.error ?? 'อ่านข้อความจากรูปไม่สำเร็จ')
@@ -128,10 +122,6 @@ export default function RegisterFlow() {
     const file = e.target.files?.[0] ?? null
     setIdentityPhoto(file)
     setOcrWarning(null)
-    setIdentityPhotoPreview(prev => {
-      if (prev) URL.revokeObjectURL(prev)
-      return file ? URL.createObjectURL(file) : null
-    })
 
     if (file && fieldErr.identity_photo) {
       setFieldErr(prev => {
@@ -140,15 +130,26 @@ export default function RegisterFlow() {
         return next
       })
     }
-    if (!file) return
+    if (!file) {
+      setIdentityPhotoPreview(null)
+      return
+    }
 
     try {
       setStep('กำลังอ่านข้อความจากรูป...')
-      const ocr = await runIdentityOcr(file)
+      const processed = await preprocessImageForOcr(file, {
+        maxSide: 1200,
+        quality: 0.8,
+        centerCrop: true,
+      })
+      setIdentityPhoto(processed.file)
+      setIdentityPhotoPreview(processed.dataUrl)
+      const ocr = await runIdentityOcr(processed.file)
       fillFormFromOcr(ocr)
       console.info('[OCR result]', ocr)
     } catch (error) {
       console.warn('[OCR skipped]', error)
+      setIdentityPhotoPreview(file ? URL.createObjectURL(file) : null)
       setOcrWarning('อ่านข้อความจากรูปไม่สำเร็จ กรุณากรอกข้อมูลเอง แล้วยังสมัครต่อได้')
     } finally {
       setStep('')
