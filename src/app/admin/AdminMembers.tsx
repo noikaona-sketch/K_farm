@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import {
-  fetchAdminMembers, approveMember, rejectMember,
+  fetchAdminMembers,
   updateMemberAdminFields,
 } from '../../lib/db'
 import { isSupabaseReady } from '../../lib/supabase'
@@ -218,7 +218,7 @@ export default function MembersPage() {
                   <th className="text-center px-3 py-3">Grade</th>
                   <th className="text-center px-3 py-3">สิทธิ์</th>
                   <th className="text-center px-3 py-3">Status</th>
-                  <th className="text-center px-4 py-3">Action</th>
+                  <th className="text-center px-4 py-3">บันทึก</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -308,7 +308,7 @@ export default function MembersPage() {
                       </td>
 
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5 justify-center flex-wrap">
+                        <div className="flex items-center justify-center">
                           <button onClick={()=>act(id, ()=>updateMemberAdminFields(id,{
                               role:e.role,
                               base_type:e.base_type,
@@ -317,38 +317,8 @@ export default function MembersPage() {
                               capabilities: makeCapabilities(e),
                             }), `💾 บันทึก`)}
                             disabled={isA}
-                            className={`px-2.5 h-7 rounded-lg text-xs font-bold transition-colors ${isA?'bg-blue-100 text-blue-300 cursor-wait':'bg-blue-500 text-white hover:bg-blue-600'}`}>
-                            {isA?'…':'💾'}
-                          </button>
-                          <button onClick={()=>act(id, ()=>approveMember(id), `✅ อนุมัติ`)}
-                            disabled={isA||e.status==='approved'}
-                            className={`w-7 h-7 rounded-lg text-sm font-bold transition-colors
-                              ${e.status==='approved'?'bg-gray-100 text-gray-300 cursor-not-allowed':isA?'bg-emerald-100 text-emerald-300 cursor-wait':'bg-emerald-500 text-white hover:bg-emerald-600'}`}>
-                            ✔
-                          </button>
-                          <button onClick={()=>act(id, ()=>rejectMember(id), `❌ ปฏิเสธ`)}
-                            disabled={isA||e.status==='rejected'}
-                            className={`w-7 h-7 rounded-lg text-sm font-bold transition-colors
-                              ${e.status==='rejected'?'bg-gray-100 text-gray-300 cursor-not-allowed':isA?'bg-red-100 text-red-300 cursor-wait':'bg-red-500 text-white hover:bg-red-600'}`}>
-                            ✖
-                          </button>
-                          <button onClick={()=>act(id, ()=>updateMemberAdminFields(id,{role:'leader',base_type:'farmer',grade:'A',status:'approved',capabilities:['is_leader','can_inspect']}), `👑 ตั้งหัวหน้า+ผู้ตรวจ`)}
-                            disabled={isA}
-                            title="ตั้งหัวหน้ากลุ่มและผู้ตรวจ"
-                            className={`px-2.5 h-7 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${isA?'bg-amber-100 text-amber-300 cursor-wait':'bg-amber-500 text-white hover:bg-amber-600'}`}>
-                            👑🔍
-                          </button>
-                          <button onClick={()=>act(id, ()=>updateMemberAdminFields(id,{role:'inspector',status:'approved',capabilities:['can_inspect']}), `🔍 ตั้งผู้ตรวจ`)}
-                            disabled={isA}
-                            title="ตั้งผู้ตรวจ"
-                            className={`px-2.5 h-7 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${isA?'bg-blue-100 text-blue-300 cursor-wait':'bg-blue-500 text-white hover:bg-blue-600'}`}>
-                            🔍
-                          </button>
-                          <button onClick={()=>act(id, ()=>updateMemberAdminFields(id,{role:'service',base_type:'service',grade:'C',status:'approved',capabilities:[]}), `🚜 ตั้งรถร่วม`)}
-                            disabled={isA}
-                            title="ตั้งเป็นรถร่วม"
-                            className={`px-2.5 h-7 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${isA?'bg-orange-100 text-orange-300 cursor-wait':'bg-orange-500 text-white hover:bg-orange-600'}`}>
-                            🚜
+                            className={`px-3 h-8 rounded-lg text-xs font-bold transition-colors ${isA?'bg-blue-100 text-blue-300 cursor-wait':'bg-blue-500 text-white hover:bg-blue-600'}`}>
+                            {isA?'กำลังบันทึก...':'บันทึก'}
                           </button>
                         </div>
                       </td>
