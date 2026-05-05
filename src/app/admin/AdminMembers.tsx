@@ -6,9 +6,12 @@ import {
 import { isSupabaseReady } from '../../lib/supabase'
 import { RefreshCw, Search, Wifi, WifiOff } from 'lucide-react'
 
+type BaseType = 'farmer' | 'service' | 'staff'
+type Grade = 'A' | 'B' | 'C'
+
 const roles     = ['member','farmer','leader','inspector','service','vehicle','admin']
-const baseTypes = ['farmer','service','staff']
-const grades    = ['C','B','A']
+const baseTypes: BaseType[] = ['farmer','service','staff']
+const grades: Grade[] = ['C','B','A']
 const statuses  = ['pending_leader','pending_admin','approved','rejected','suspended']
 
 const STATUS_DOT: Record<string, string> = {
@@ -21,11 +24,19 @@ const STATUS_DOT: Record<string, string> = {
 
 interface RowEdit {
   role: string
-  base_type: string
-  grade: string
+  base_type: BaseType
+  grade: Grade
   status: string
   is_leader: boolean
   can_inspect: boolean
+}
+
+function asBaseType(value: unknown): BaseType {
+  return value === 'service' || value === 'staff' ? value : 'farmer'
+}
+
+function asGrade(value: unknown): Grade {
+  return value === 'A' || value === 'B' ? value : 'C'
 }
 
 function readCapabilities(u: Record<string, unknown>): string[] {
@@ -66,8 +77,8 @@ export default function MembersPage() {
         const caps = readCapabilities(u)
         init[u.id as string] = {
           role:        String(u.role ?? 'member'),
-          base_type:   String(u.base_type ?? u.baseType ?? 'farmer'),
-          grade:       String(u.grade ?? 'C'),
+          base_type:   asBaseType(u.base_type ?? u.baseType),
+          grade:       asGrade(u.grade),
           status:      String(u.status ?? 'pending_leader'),
           is_leader:   caps.includes('is_leader'),
           can_inspect: caps.includes('can_inspect') || Boolean(u.can_inspect),
@@ -204,8 +215,8 @@ export default function MembersPage() {
                   const id  = String(u.id)
                   const e   = edits[id] ?? {
                     role: String(u.role ?? 'member'),
-                    base_type: String(u.base_type ?? 'farmer'),
-                    grade: String(u.grade ?? 'C'),
+                    base_type: asBaseType(u.base_type),
+                    grade: asGrade(u.grade),
                     status: String(u.status ?? 'pending_leader'),
                     is_leader: false,
                     can_inspect: false,
@@ -234,7 +245,7 @@ export default function MembersPage() {
                       </td>
 
                       <td className="px-3 py-3 text-center">
-                        <select value={e.base_type} onChange={ev=>setEdit(id,{base_type:ev.target.value})}
+                        <select value={e.base_type} onChange={ev=>setEdit(id,{base_type:asBaseType(ev.target.value)})}
                           className="border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:border-emerald-500">
                           {baseTypes.map(b=><option key={b}>{b}</option>)}
                         </select>
@@ -248,7 +259,7 @@ export default function MembersPage() {
                       </td>
 
                       <td className="px-3 py-3 text-center">
-                        <select value={e.grade} onChange={ev=>setEdit(id,{grade:ev.target.value})}
+                        <select value={e.grade} onChange={ev=>setEdit(id,{grade:asGrade(ev.target.value)})}
                           className="border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:border-emerald-500 w-20">
                           {grades.map(g=><option key={g}>{g}</option>)}
                         </select>
