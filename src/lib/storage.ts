@@ -1,6 +1,47 @@
 import { supabase, isSupabaseReady } from './supabase'
+import { preprocessImageForOcr } from './imagePreprocess'
 
 const BUCKET = 'farm-photos'
+const STORAGE_MAX_SIDE = 1600
+const STORAGE_QUALITY = 0.82
+const MAX_UPLOAD_BYTES = 1_800_000
+
+async function prepareImageForStorage(file: File): Promise<File> {
+  if (!file.type.startsWith('image/')) return file
+
+  try {
+    const processed = await preprocessImageForOcr(file, {
+      centerCrop: false,
+      maxSide: STORAGE_MAX_SIDE,
+      quality: STORAGE_QUALITY,
+      mimeType: 'image/jpeg',
+    })
+
+    if (processed.file.size > MAX_UPLOAD_BYTES) {
+      const smaller = await preprocessImageForOcr(file, {
+        centerCrop: false,
+        maxSide: 1280,
+        quality: 0.74,
+        mimeType: 'image/jpeg',
+      })
+      console.info('[storage] compressed image:', file.size, '→', smaller.file.size)
+      return smaller.file
+    }
+
+    console.info('[storage] compressed image:', file.size, '→', processed.file.size)
+    return processed.file
+  } catch (err) {
+    console.warn('[storage] image compression skipped:', err)
+    return file
+  }
+}
+
+function makeUploadPath(prefix: string, originalName: string) {
+  const safeExt = originalName.split('.').pop()?.toLowerCase()
+  const ext = safeExt && ['jpg', 'jpeg', 'png', 'webp'].includes(safeExt) ? safeExt : 'jpg'
+  const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+  return `${prefix}/${fileName}`
+}
 
 /**
  * อัปโหลดรูปแปลงไปยัง Supabase Storage bucket: farm-photos
@@ -16,18 +57,17 @@ export async function uploadFarmPhoto(
     return null
   }
 
-  const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
-  const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-  const path = `farmers/${farmerId}/${fileName}`
+  const uploadFile = await prepareImageForStorage(file)
+  const path = makeUploadPath(`farmers/${farmerId}`, uploadFile.name)
 
   console.info('[storage] uploading to', BUCKET, path)
 
   const { data, error } = await supabase.storage
     .from(BUCKET)
-    .upload(path, file, {
+    .upload(path, uploadFile, {
       cacheControl: '3600',
       upsert: false,
-      contentType: file.type || 'image/jpeg',
+      contentType: uploadFile.type || 'image/jpeg',
     })
 
   if (error) {
@@ -57,13 +97,16 @@ export async function uploadNoBurnPhoto(
     return null
   }
 
-  const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
-  const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-  const path = `no-burn/${farmerId}/${photoType}/${fileName}`
+  const uploadFile = await prepareImageForStorage(file)
+  const path = makeUploadPath(`no-burn/${farmerId}/${photoType}`, uploadFile.name)
 
   const { data, error } = await supabase.storage
     .from(BUCKET)
-    .upload(path, file, { cacheControl: '3600', upsert: false })
+    .upload(path, uploadFile, {
+      cacheControl: '3600',
+      upsert: false,
+      contentType: uploadFile.type || 'image/jpeg',
+    })
 
   if (error) {
     console.error('[storage] no-burn upload error:', error.message)
@@ -92,13 +135,16 @@ export async function uploadPlantingPhoto(
     return null
   }
 
-  const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
-  const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-  const path = `planting/${farmerId}/${cycleId}/${stepKey}/${fileName}`
+  const uploadFile = await prepareImageForStorage(file)
+  const path = makeUploadPath(`planting/${farmerId}/${cycleId}/${stepKey}`, uploadFile.name)
 
   const { data, error } = await supabase.storage
     .from(BUCKET)
-    .upload(path, file, { cacheControl: '3600', upsert: false })
+    .upload(path, uploadFile, {
+      cacheControl: '3600',
+      upsert: false,
+      contentType: uploadFile.type || 'image/jpeg',
+    })
 
   if (error) {
     console.error('[storage] planting upload error:', error.message)
