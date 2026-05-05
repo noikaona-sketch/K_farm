@@ -5,6 +5,7 @@ import { useAuth } from '../../routes/AuthContext'
 import { insertFarm } from '../../lib/db'
 import { uploadFarmPhoto } from '../../lib/storage'
 import { isSupabaseReady } from '../../lib/supabase'
+import { preprocessImageForOcr } from '../../lib/imagePreprocess'
 
 async function readExifCoords(file: File): Promise<{ lat: number; lng: number } | null> {
   return new Promise(resolve => {
@@ -73,11 +74,26 @@ export default function PinFarm() {
 
   const handlePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return
-    setPhotoFile(file)  // เก็บ File object สำหรับ upload
-    const reader = new FileReader()
-    reader.onload = ev => setPhoto(ev.target!.result as string)
-    reader.readAsDataURL(file)
+    setErr(null)
+
     const exif = await readExifCoords(file)
+    try {
+      const processed = await preprocessImageForOcr(file, {
+        centerCrop: false,
+        maxSide: 1280,
+        quality: 0.82,
+      })
+      setPhotoFile(processed.file)  // upload รูปที่ย่อแล้ว แต่พิกัดใช้จากไฟล์ต้นฉบับ
+      setPhoto(processed.dataUrl)
+    } catch (preprocessErr) {
+      console.warn('[PinFarm] image preprocess failed:', preprocessErr)
+      setPhotoFile(file)
+      const reader = new FileReader()
+      reader.onload = ev => setPhoto(ev.target!.result as string)
+      reader.readAsDataURL(file)
+      setErr('ย่อรูปไม่สำเร็จ ระบบจะใช้รูปต้นฉบับแทน')
+    }
+
     if (exif) { setCoords(exif); setGpsSource('✨ พิกัดจาก EXIF รูปถ่าย') }
     else requestGPS()
   }
