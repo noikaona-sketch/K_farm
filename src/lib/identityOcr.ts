@@ -19,7 +19,7 @@ function isThaiText(value: string) {
 
 function cleanName(value: string) {
   return value
-    .replace(/^(ชื่อ|ชื่อตัวและชื่อสกุล|Thai Name|Name|Full Name)\s*[:：]?\s*/i, '')
+    .replace(/^(ชื่อ|ชื่อตัวและชื่อสกุล|ชื่อตัวและซึ่งสกุล|ชื่อตัวและซื่อสกุล|Thai Name|Name|Full Name)\s*[:：]?\s*/i, '')
     .replace(/\s+/g, ' ')
     .trim()
 }
@@ -33,7 +33,7 @@ function cleanThaiNameCandidate(value: string) {
 }
 
 function extractThaiNameAfterMarker(rawText: string) {
-  const markerPattern = /ชื่อตัวและชื่อสกุล\s*[:：]?\s*/i
+  const markerPattern = /ชื่อตัว\s*และ\s*(?:ชื่อ|ซึ่ง|ซื่อ)\s*สกุล\s*[:：]?\s*/i
   const lines = rawText.split(/\r?\n/).map(line => line.trim()).filter(Boolean)
 
   for (let i = 0; i < lines.length; i += 1) {
@@ -54,7 +54,7 @@ function extractThaiNameAfterMarker(rawText: string) {
   }
 
   const compact = rawText.replace(/\s+/g, ' ').trim()
-  const compactMatch = compact.match(/ชื่อตัวและชื่อสกุล\s*[:：]?\s*([ก-๙\s.]{3,80})/i)
+  const compactMatch = compact.match(/ชื่อตัว\s*และ\s*(?:ชื่อ|ซึ่ง|ซื่อ)\s*สกุล\s*[:：]?\s*([^\n]{3,120})/i)
   return compactMatch ? cleanThaiNameCandidate(compactMatch[1]) : ''
 }
 
@@ -68,7 +68,7 @@ function extractThaiNameFromRawText(rawText: string) {
     const cleaned = cleanThaiNameCandidate(line)
     if (
       isThaiText(cleaned) &&
-      /^(นาย|นาง|นางสาว)\s*[ก-๙]/.test(cleaned) &&
+      /^(นาย|นาง|นางสาว|น\.ส\.)\s*[ก-๙]/.test(cleaned) &&
       !/(เลข|บัตร|ประชาชน|เกิด|ที่อยู่|ศาสนา|วัน|หมดอายุ|ออกบัตร)/.test(cleaned)
     ) {
       return cleaned
@@ -76,7 +76,7 @@ function extractThaiNameFromRawText(rawText: string) {
   }
 
   const compact = rawText.replace(/\s+/g, ' ').trim()
-  const match = compact.match(/(นาย|นางสาว|นาง)\s*[ก-๙][ก-๙\s.]{3,80}/)
+  const match = compact.match(/(นาย|นางสาว|นาง|น\.ส\.)\s*[ก-๙][ก-๙\s.]{3,80}/)
   return match ? cleanThaiNameCandidate(match[0]) : ''
 }
 
