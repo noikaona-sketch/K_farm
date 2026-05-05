@@ -6,6 +6,7 @@ import type { AppRole } from './lib/roles'
 import MobileLayout from './layouts/MobileLayout'
 import AdminLayout  from './layouts/AdminLayout'
 import AdminRoute   from './routes/AdminRoute'
+import FieldMemberRegister from './app/field/FieldMemberRegister'
 import FieldVehicleRegister from './app/field/FieldVehicleRegister'
 
 // Auth
