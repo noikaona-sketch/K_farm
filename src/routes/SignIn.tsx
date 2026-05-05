@@ -14,6 +14,11 @@ export default function SignIn() {
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
+  const goRegister = () => {
+    const cleanId = idCard.replace(/[-\s]/g, '').trim()
+    navigate(cleanId ? `/register?idCard=${encodeURIComponent(cleanId)}` : '/register')
+  }
+
   const handleLogin = async () => {
     if (!idCard.trim()) { setErr('กรุณากรอกเลขบัตรประชาชน'); return }
     if (!phone.trim()) { setErr('กรุณากรอกเบอร์โทรศัพท์'); return }

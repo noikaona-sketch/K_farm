@@ -93,6 +93,22 @@ function LiffGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+function FarmerNoBurnPage() {
+  return (
+    <div className="p-5 space-y-4">
+      <div>
+        <h1 className="text-xl font-bold text-gray-900">กิจกรรมไม่เผา</h1>
+        <p className="text-gray-500 text-sm mt-1">ติดตามและบันทึกกิจกรรมไม่เผาสำหรับสมาชิก</p>
+      </div>
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+        <div className="text-3xl mb-2">🚫</div>
+        <h2 className="font-bold text-gray-800">ยังไม่มีรายการกิจกรรม</h2>
+        <p className="text-sm text-gray-500 mt-1">รอเชื่อมข้อมูลกิจกรรมไม่เผาในขั้นถัดไป</p>
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
   return (
     <AuthProvider><LiffGuard><Routes>
@@ -109,8 +125,10 @@ export default function App() {
         <Route path="seeds" element={<SeedVarieties />} />
         <Route path="seed-booking" element={<MemberSeedBookingMobile />} />
         <Route path="seed-booking-history" element={<MemberSeedBookingHistory />} />
+        <Route path="history" element={<MemberSeedBookingHistory />} />
         <Route path="prices" element={<PriceAnnouncement />} />
         <Route path="tier" element={<MemberTier />} />
+        <Route path="no-burn" element={<FarmerNoBurnPage />} />
         <Route path="pin" element={<RequireAuth minRole="farmer"><PinFarm /></RequireAuth>} />
         <Route path="farms" element={<RequireAuth minRole="farmer"><MyFarms /></RequireAuth>} />
         <Route path="farms/add" element={<RequireAuth minRole="farmer"><AddFarm /></RequireAuth>} />
