@@ -89,7 +89,16 @@ function LiffGuard({ children }: { children: React.ReactNode }) {
     if (isInsideLine && user && user.role === 'admin') window.location.href = '/admin'
     if (isInsideLine && !user) return
     if (isInsideLine && user?.role !== 'admin') {
-      if (!window.location.pathname.startsWith('/farmer') && !window.location.pathname.startsWith('/field') && !window.location.pathname.startsWith('/leader') && !window.location.pathname.startsWith('/inspector') && !window.location.pathname.startsWith('/service')) window.location.href = homePath || ROLE_HOME[user?.role ?? 'farmer'] ?? '/farmer'
+      const isAllowedPath =
+        window.location.pathname.startsWith('/farmer') ||
+        window.location.pathname.startsWith('/field') ||
+        window.location.pathname.startsWith('/leader') ||
+        window.location.pathname.startsWith('/inspector') ||
+        window.location.pathname.startsWith('/service')
+
+      if (!isAllowedPath) {
+        window.location.href = homePath || ROLE_HOME[user?.role ?? 'farmer'] || '/farmer'
+      }
     }
   }, [user, homePath])
   return <>{children}</>
