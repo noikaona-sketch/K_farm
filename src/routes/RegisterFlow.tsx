@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   ChevronLeft, Check, AlertCircle, RefreshCw,
-  User, CreditCard, Phone, MapPin, Building2,Camera,
+  User, CreditCard, Phone, MapPin, Building2, Camera,
 } from 'lucide-react'
 import { useAuth } from './AuthContext'
 import { registerFarmerMember } from '../lib/db'
@@ -10,6 +10,41 @@ import { isSupabaseReady } from '../lib/supabase'
 
 const PROVINCES = ['บุรีรัมย์','สุรินทร์','ศรีสะเกษ','นครราชสีมา','ร้อยเอ็ด','อุบลราชธานี','ยโสธร','มุกดาหาร']
 const BANKS = ['ธนาคารกรุงไทย','ธนาคารออมสิน','ธ.ก.ส.','ธนาคารกรุงเทพ','ธนาคารไทยพาณิชย์','ธนาคารกสิกรไทย','ธนาคารกรุงศรีอยุธยา']
+
+type IdentityOcrResult = {
+  full_name: string
+  id_card: string
+  address: string
+  province: string
+  district: string
+  subdistrict: string
+  confidence: number
+  raw_text: string
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = String(reader.result ?? '')
+      resolve(result.split(',')[1] ?? '')
+    }
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
+}
+
+async function runIdentityOcr(file: File): Promise<IdentityOcrResult> {
+  const imageBase64 = await fileToBase64(file)
+  const res = await fetch('/api/ocr-identity', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ imageBase64, mimeType: file.type || 'image/jpeg' }),
+  })
+  const json = await res.json()
+  if (!res.ok) throw new Error(json.error ?? 'อ่านข้อความจากรูปไม่สำเร็จ')
+  return json as IdentityOcrResult
+}
 
 // ── Uncontrolled text input — zero re-render while typing ─────────────────────
 function Field({
@@ -52,7 +87,6 @@ export default function RegisterFlow() {
   const { login } = useAuth()
   const formRef = useRef<HTMLFormElement>(null)
 
-  // Select refs (dropdowns stay controlled — no typing so no lag)
   const [province, setProvince] = useState('บุรีรัมย์')
   const [bankName, setBankName] = useState('ธ.ก.ส.')
 
@@ -63,21 +97,52 @@ export default function RegisterFlow() {
   const [identityPhoto, setIdentityPhoto] = useState<File | null>(null)
   const [identityPhotoPreview, setIdentityPhotoPreview] = useState<string | null>(null)
 
-  const handleIdentityPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-  const file = e.target.files?.[0] ?? null
-  setIdentityPhoto(file)
-  setIdentityPhotoPreview(prev => {
-    if (prev) URL.revokeObjectURL(prev)
-    return file ? URL.createObjectURL(file) : null
-  })
-  if (file && fieldErr.identity_photo) {
-    setFieldErr(prev => {
-      const next = { ...prev }
-      delete next.identity_photo
-      return next
-    })
+  const fillFormFromOcr = (ocr: IdentityOcrResult) => {
+    const form = formRef.current
+    if (!form) return
+    const fullNameInput = form.querySelector<HTMLInputElement>('[name="full_name"]')
+    const idCardInput = form.querySelector<HTMLInputElement>('[name="id_card"]')
+    const districtInput = form.querySelector<HTMLInputElement>('[name="district"]')
+    const villageInput = form.querySelector<HTMLInputElement>('[name="village"]')
+
+    if (ocr.full_name && fullNameInput && !fullNameInput.value) fullNameInput.value = ocr.full_name
+    if (ocr.id_card && idCardInput && !idCardInput.value) idCardInput.value = ocr.id_card
+    if (ocr.district && districtInput && !districtInput.value) districtInput.value = ocr.district
+    if (ocr.address && villageInput && !villageInput.value) villageInput.value = ocr.address
+    if (ocr.province) setProvince(ocr.province)
   }
-}
+
+  const handleIdentityPhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null
+    setIdentityPhoto(file)
+    setIdentityPhotoPreview(prev => {
+      if (prev) URL.revokeObjectURL(prev)
+      return file ? URL.createObjectURL(file) : null
+    })
+
+    if (file && fieldErr.identity_photo) {
+      setFieldErr(prev => {
+        const next = { ...prev }
+        delete next.identity_photo
+        return next
+      })
+    }
+
+    if (!file) return
+
+    try {
+      setErr(null)
+      setStep('กำลังอ่านข้อความจากรูป...')
+      const ocr = await runIdentityOcr(file)
+      fillFormFromOcr(ocr)
+      console.info('[OCR result]', ocr)
+    } catch (error) {
+      console.error('[OCR]', error)
+      setErr(error instanceof Error ? error.message : 'อ่านข้อความจากรูปไม่สำเร็จ')
+    } finally {
+      setStep('')
+    }
+  }
   
   const getValues = () => {
     const fd = new FormData(formRef.current!)
@@ -98,11 +163,11 @@ export default function RegisterFlow() {
     const e: Record<string, string> = {}
     if (!v.full_name)                      e.full_name         = 'กรุณากรอกชื่อ-นามสกุล'
     if (v.id_card.length !== 13)           e.id_card           = 'เลขบัตรประชาชน 13 หลัก'
-    if (v.phone.length < 9)               e.phone             = 'กรุณากรอกเบอร์โทรให้ถูกต้อง'
+    if (v.phone.length < 9)                e.phone             = 'กรุณากรอกเบอร์โทรให้ถูกต้อง'
     if (!v.district)                       e.district          = 'กรุณากรอกอำเภอ'
-    if (!v.bank_account_no)               e.bank_account_no   = 'กรุณากรอกเลขบัญชี'
-    if (!v.bank_account_name)             e.bank_account_name = 'กรุณากรอกชื่อบัญชี'
-    if (!identityPhoto) e.identity_photo = 'กรุณาแนบรูปเอกสารยืนยันตัวตน'
+    if (!v.bank_account_no)                e.bank_account_no   = 'กรุณากรอกเลขบัญชี'
+    if (!v.bank_account_name)              e.bank_account_name = 'กรุณากรอกชื่อบัญชี'
+    if (!identityPhoto)                    e.identity_photo    = 'กรุณาแนบรูปเอกสารยืนยันตัวตน'
     return e
   }
 
@@ -112,7 +177,6 @@ export default function RegisterFlow() {
     const errors = validate(values)
     if (Object.keys(errors).length > 0) {
       setFieldErr(errors)
-      // scroll to first error
       const firstKey = Object.keys(errors)[0]
       formRef.current?.querySelector<HTMLInputElement>(`[name="${firstKey}"]`)?.focus()
       return
@@ -140,7 +204,6 @@ export default function RegisterFlow() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <div className="bg-emerald-600 text-white px-5 py-4 flex items-center gap-3 sticky top-0 z-40 shadow-md">
         <button type="button" onClick={() => navigate('/login')}
           className="p-1.5 rounded-xl hover:bg-white/20 transition-colors">
@@ -155,8 +218,7 @@ export default function RegisterFlow() {
         </div>
       </div>
 
-      {/* Loading overlay */}
-      {saving && (
+      {(saving || step) && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-6">
           <div className="bg-white rounded-3xl p-8 flex flex-col items-center gap-4 w-full max-w-xs shadow-2xl">
             <RefreshCw className="w-12 h-12 text-emerald-600 animate-spin" />
@@ -168,10 +230,7 @@ export default function RegisterFlow() {
         </div>
       )}
 
-      {/* Form — uncontrolled via ref + FormData */}
       <form ref={formRef} onSubmit={handleSubmit} className="p-5 space-y-5 pb-10">
-
-        {/* Info */}
         <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex gap-3">
           <AlertCircle className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
           <div className="text-sm text-blue-700 leading-relaxed">
@@ -180,7 +239,6 @@ export default function RegisterFlow() {
           </div>
         </div>
 
-        {/* Error */}
         {err && (
           <div className="bg-red-50 border-2 border-red-300 rounded-2xl p-4 flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
@@ -191,7 +249,6 @@ export default function RegisterFlow() {
           </div>
         )}
 
-        {/* ── Section 1: ข้อมูลส่วนตัว ── */}
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5 space-y-4">
           <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
             <User className="w-5 h-5 text-emerald-600" />
@@ -205,37 +262,33 @@ export default function RegisterFlow() {
           <Field label="เบอร์โทรศัพท์ * (รหัสผ่านชั่วคราว)" name="phone"
             placeholder="08x-xxx-xxxx" inputMode="tel" icon={Phone}
             note="เบอร์ที่ใช้ตอนสมัคร = รหัสผ่าน" errMsg={fieldErr.phone} />
+
+          <div>
+            <label className="text-sm font-semibold text-gray-700 flex items-center gap-1.5 mb-1.5">
+              <Camera className="w-4 h-4 text-emerald-600" />
+              รูปเอกสารยืนยันตัวตน *
+            </label>
+            <input
+              name="identity_photo"
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handleIdentityPhotoChange}
+              className={`w-full border-2 rounded-2xl px-4 py-3.5 text-sm bg-white
+                ${fieldErr.identity_photo ? 'border-red-400 bg-red-50' : 'border-gray-200 focus:border-emerald-500'}`}
+            />
+            {fieldErr.identity_photo && <p className="text-red-500 text-xs mt-1 ml-1">{fieldErr.identity_photo}</p>}
+            {!fieldErr.identity_photo && <p className="text-gray-400 text-xs mt-1 ml-1">ถ่ายหรือแนบรูปให้ชัดเจน ระบบจะพยายามอ่านข้อมูลให้อัตโนมัติ</p>}
+            {identityPhotoPreview && (
+              <img
+                src={identityPhotoPreview}
+                alt="ตัวอย่างรูปเอกสาร"
+                className="mt-3 w-full max-h-56 object-contain rounded-2xl border border-gray-200 bg-gray-50"
+              />
+            )}
+          </div>
         </div>
-<div>
-  <label className="text-sm font-semibold text-gray-700 flex items-center gap-1.5 mb-1.5">
-    <Camera className="w-4 h-4 text-emerald-600" />
-    รูปเอกสารยืนยันตัวตน *
-  </label>
-  <input
-    name="identity_photo"
-    type="file"
-    accept="image/*"
-    capture="environment"
-    onChange={handleIdentityPhotoChange}
-    className={`w-full border-2 rounded-2xl px-4 py-3.5 text-sm bg-white
-      ${fieldErr.identity_photo ? 'border-red-400 bg-red-50' : 'border-gray-200 focus:border-emerald-500'}`}
-  />
-  {fieldErr.identity_photo && (
-    <p className="text-red-500 text-xs mt-1 ml-1">{fieldErr.identity_photo}</p>
-  )}
-  {!fieldErr.identity_photo && (
-    <p className="text-gray-400 text-xs mt-1 ml-1">ถ่ายหรือแนบรูปให้ชัดเจน</p>
-  )}
-  {identityPhotoPreview && (
-    <img
-      src={identityPhotoPreview}
-      alt="ตัวอย่างรูปเอกสาร"
-      className="mt-3 w-full max-h-56 object-contain rounded-2xl border border-gray-200 bg-gray-50"
-    />
-  )}
-</div>
         
-        {/* ── Section 2: ที่อยู่ ── */}
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5 space-y-4">
           <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
             <MapPin className="w-5 h-5 text-emerald-600" />
@@ -256,7 +309,6 @@ export default function RegisterFlow() {
             placeholder="เช่น บ้านดง ต.นาดี" />
         </div>
 
-        {/* ── Section 3: บัญชีธนาคาร ── */}
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5 space-y-4">
           <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
             <Building2 className="w-5 h-5 text-emerald-600" />
@@ -279,12 +331,10 @@ export default function RegisterFlow() {
             errMsg={fieldErr.bank_account_name} />
         </div>
 
-        {/* Consent */}
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-700 leading-relaxed">
           การสมัครสมาชิกถือว่าท่านยินยอมให้จัดเก็บข้อมูลส่วนบุคคลเพื่อใช้ในกระบวนการรับซื้อข้าวโพดและการชำระเงิน
         </div>
 
-        {/* Submit */}
         <button type="submit" disabled={saving}
           className={`w-full py-5 rounded-2xl font-bold text-lg shadow-xl flex items-center justify-center gap-3 transition-all
             ${saving
