@@ -514,6 +514,7 @@ function mapFarmerRow(row: Record<string, unknown>, profile: Record<string, unkn
 }
 
 /** ค้นหา user ด้วย id_card */
+/** ค้นหา user ด้วย id_card */
 export async function findProfileByIdCard(
   idCard: string
 ): Promise<DbResult<AuthUser | null>> {
@@ -521,10 +522,12 @@ export async function findProfileByIdCard(
     return { data: null, error: null, source: 'mock' }
   }
 
+  const cleanId = idCard.replace(/[-\s]/g, '').trim()
+
   const { data: profile, error: pErr } = await supabase
     .from('profiles')
     .select('id, full_name, phone, id_card, bank_name, bank_account_no, bank_account_name, role')
-    .eq('id_card', idCard.trim())
+    .eq('id_card', cleanId)
     .maybeSingle()
 
   if (pErr) {
@@ -545,7 +548,27 @@ export async function findProfileByIdCard(
     return { data: null, error: fErr.message, source: 'supabase' }
   }
 
-  if (!farmer) return { data: null, error: null, source: 'supabase' }
+  // สำคัญ: ถ้าเจอ profiles แล้ว แต่ยังไม่มี farmers row
+  // ให้คืน AuthUser แบบ placeholder เพื่อบอกระบบว่า "มีเลขบัตรนี้แล้ว"
+  if (!farmer) {
+    return {
+      data: {
+        id: '',
+        profileId: String(profile.id),
+        name: String(profile.full_name ?? 'ไม่ระบุ'),
+        role: (String(profile.role ?? 'member')) as import('../routes/AuthContext').AppRole,
+        code: '',
+        phone: String(profile.phone ?? ''),
+        idCard: String(profile.id_card ?? cleanId),
+        bankName: profile.bank_name ? String(profile.bank_name) : undefined,
+        bankAccountNo: profile.bank_account_no ? String(profile.bank_account_no) : undefined,
+        bankAccountName: profile.bank_account_name ? String(profile.bank_account_name) : undefined,
+        registrationStatus: 'none',
+      },
+      error: null,
+      source: 'supabase',
+    }
+  }
 
   return {
     data: mapFarmerRow(farmer as Record<string, unknown>, profile as Record<string, unknown>),
@@ -582,11 +605,14 @@ export async function loginWithIdCardPhone(
     return { data: null, error: null, source: 'mock' }
   }
 
+  const cleanId = idCard.replace(/[-\s]/g, '').trim()
+  const cleanPhone = phone.replace(/[-\s]/g, '').trim()
+
   const { data: profile, error: pErr } = await supabase
     .from('profiles')
     .select('id, full_name, phone, id_card, bank_name, bank_account_no, bank_account_name, role')
-    .eq('id_card', idCard.trim())
-    .eq('phone', phone.trim())
+    .eq('id_card', cleanId)
+    .eq('phone', cleanPhone)
     .maybeSingle()
 
   if (pErr) {
@@ -607,7 +633,25 @@ export async function loginWithIdCardPhone(
     return { data: null, error: fErr.message, source: 'supabase' }
   }
 
-  if (!farmer) return { data: null, error: null, source: 'supabase' }
+  if (!farmer) {
+    return {
+      data: {
+        id: '',
+        profileId: String(profile.id),
+        name: String(profile.full_name ?? 'ไม่ระบุ'),
+        role: (String(profile.role ?? 'member')) as import('../routes/AuthContext').AppRole,
+        code: '',
+        phone: String(profile.phone ?? ''),
+        idCard: String(profile.id_card ?? cleanId),
+        bankName: profile.bank_name ? String(profile.bank_name) : undefined,
+        bankAccountNo: profile.bank_account_no ? String(profile.bank_account_no) : undefined,
+        bankAccountName: profile.bank_account_name ? String(profile.bank_account_name) : undefined,
+        registrationStatus: 'none',
+      },
+      error: null,
+      source: 'supabase',
+    }
+  }
 
   return {
     data: mapFarmerRow(farmer as Record<string, unknown>, profile as Record<string, unknown>),
@@ -615,7 +659,8 @@ export async function loginWithIdCardPhone(
     source: 'supabase',
   }
 }
-/** สมัครสมาชิก: check dup → upsert profile → insert farmer */
+
+/** สมัครสมาชิก: check dup → upsert profile → insert/update farmer */
 export async function registerFarmerMember(
   payload: RegisterPayload
 ): Promise<DbResult<AuthUser>> {
@@ -639,44 +684,50 @@ export async function registerFarmerMember(
     return { data: mockUser, error: null, source: 'mock' }
   }
 
-  // 1. ตรวจสอบว่ามี id_card ซ้ำไหม
-  const existing = await findProfileByIdCard(payload.id_card)
-  if (existing.error) return { data: null, error: existing.error, source: 'supabase' }
+  const cleanId = payload.id_card.replace(/[-\s]/g, '').trim()
+
+  // 1. ยึด id_card เป็นตัวหลักเสมอ
+  const { data: profile, error: pFindErr } = await supabase
+    .from('profiles')
+    .select('id, full_name, phone, id_card, bank_name, bank_account_no, bank_account_name, role')
+    .eq('id_card', cleanId)
+    .maybeSingle()
+
+  if (pFindErr) {
+    logSupabaseError('registerFarmerMember:findProfile', pFindErr)
+    return { data: null, error: pFindErr.message, source: 'supabase' }
+  }
 
   let profileId: string
-  let farmerId: string
 
-  if (existing.data) {
-    // มีอยู่แล้ว → update ข้อมูลที่ขาด
-    profileId = existing.data.profileId
-    farmerId = existing.data.id
+  if (profile) {
+    // 2. มี profile เดิมแล้ว → update profile เดิม ห้าม insert ใหม่
+    profileId = String(profile.id)
 
-    const updateProfile: Record<string, unknown> = {}
-    if (!existing.data.name || existing.data.name === 'ไม่ระบุ') updateProfile.full_name = payload.full_name
-    if (!existing.data.bankName && payload.bank_name) updateProfile.bank_name = payload.bank_name
-    if (!existing.data.bankAccountNo && payload.bank_account_no) updateProfile.bank_account_no = payload.bank_account_no
-    if (!existing.data.bankAccountName && payload.bank_account_name) updateProfile.bank_account_name = payload.bank_account_name
+    const { error: updateProfileErr } = await supabase
+      .from('profiles')
+      .update({
+        full_name: payload.full_name || profile.full_name,
+        phone: payload.phone || profile.phone,
+        role: profile.role ?? 'farmer',
+        bank_name: payload.bank_name ?? profile.bank_name ?? null,
+        bank_account_no: payload.bank_account_no ?? profile.bank_account_no ?? null,
+        bank_account_name: payload.bank_account_name ?? profile.bank_account_name ?? null,
+      })
+      .eq('id', profileId)
 
-    if (Object.keys(updateProfile).length > 0) {
-      const { error } = await supabase.from('profiles').update(updateProfile).eq('id', profileId)
-      if (error) logSupabaseError('registerFarmerMember:updateProfile', error)
+    if (updateProfileErr) {
+      logSupabaseError('registerFarmerMember:updateProfile', updateProfileErr)
+      return { data: null, error: updateProfileErr.message, source: 'supabase' }
     }
-
-    const updateFarmer: Record<string, unknown> = { status: 'pending_leader' }
-    if (payload.province) updateFarmer.province = payload.province
-    if (payload.district) updateFarmer.district = payload.district
-    if (payload.village) updateFarmer.village = payload.village
-    const { error: fe } = await supabase.from('farmers').update(updateFarmer).eq('id', farmerId)
-    if (fe) logSupabaseError('registerFarmerMember:updateFarmer', fe)
-
   } else {
-    // ไม่มีอยู่ → insert ใหม่
+    // 3. ไม่มี profile จริง ๆ → insert ใหม่
     const { data: pData, error: pErr } = await supabase
       .from('profiles')
       .insert({
         full_name: payload.full_name,
         phone: payload.phone,
-        id_card: payload.id_card,
+        id_card: cleanId,
         role: 'farmer',
         bank_name: payload.bank_name ?? null,
         bank_account_no: payload.bank_account_no ?? null,
@@ -684,13 +735,59 @@ export async function registerFarmerMember(
       })
       .select('id')
       .single()
+
     if (pErr) {
       logSupabaseError('registerFarmerMember:insertProfile', pErr)
+
+      // กันกรณี unique id_card ชนจาก race condition
+      if (pErr.message?.includes('duplicate') || pErr.code === '23505') {
+        return { data: null, error: 'เลขบัตรประชาชนนี้มีอยู่ในระบบแล้ว', source: 'supabase' }
+      }
+
       return { data: null, error: pErr.message, source: 'supabase' }
     }
-    profileId = pData.id
 
+    profileId = pData.id
+  }
+
+  // 4. หา farmers row ของ profile นี้
+  const { data: farmer, error: farmerFindErr } = await supabase
+    .from('farmers')
+    .select('id, code, province, district, village, status')
+    .eq('profile_id', profileId)
+    .maybeSingle()
+
+  if (farmerFindErr) {
+    logSupabaseError('registerFarmerMember:findFarmer', farmerFindErr)
+    return { data: null, error: farmerFindErr.message, source: 'supabase' }
+  }
+
+  let farmerId: string
+  let farmerCode: string
+
+  if (farmer) {
+    // 5. มี farmers row แล้ว → update
+    farmerId = String(farmer.id)
+    farmerCode = String(farmer.code ?? '')
+
+    const { error: updateFarmerErr } = await supabase
+      .from('farmers')
+      .update({
+        province: payload.province ?? farmer.province ?? null,
+        district: payload.district ?? farmer.district ?? null,
+        village: payload.village ?? farmer.village ?? null,
+        status: 'pending_leader',
+      })
+      .eq('id', farmerId)
+
+    if (updateFarmerErr) {
+      logSupabaseError('registerFarmerMember:updateFarmer', updateFarmerErr)
+      return { data: null, error: updateFarmerErr.message, source: 'supabase' }
+    }
+  } else {
+    // 6. มี profile แต่ยังไม่มี farmers row → insert farmers ใต้ profile เดิม
     const code = `KF${Date.now().toString().slice(-6)}`
+
     const { data: fData, error: fErr } = await supabase
       .from('farmers')
       .insert({
@@ -705,51 +802,35 @@ export async function registerFarmerMember(
       })
       .select('id, code')
       .single()
+
     if (fErr) {
       logSupabaseError('registerFarmerMember:insertFarmer', fErr)
       return { data: null, error: fErr.message, source: 'supabase' }
     }
-    farmerId = fData.id
 
-    const authUser: AuthUser = {
-      id: farmerId,
-      profileId,
-      name: payload.full_name,
-      role: 'farmer',
-      code: fData.code,
-      phone: payload.phone,
-      idCard: payload.id_card,
-      province: payload.province,
-      district: payload.district,
-      village: payload.village,
-      bankName: payload.bank_name,
-      bankAccountNo: payload.bank_account_no,
-      bankAccountName: payload.bank_account_name,
-      registrationStatus: 'pending_leader',
-    }
-    return { data: authUser, error: null, source: 'supabase' }
+    farmerId = fData.id
+    farmerCode = fData.code
   }
 
-  // คืน updated user
   const authUser: AuthUser = {
     id: farmerId,
     profileId,
-    name: payload.full_name || existing.data!.name,
+    name: payload.full_name,
     role: 'farmer',
-    code: existing.data!.code,
+    code: farmerCode,
     phone: payload.phone,
-    idCard: payload.id_card,
-    province: payload.province || existing.data!.province,
-    district: payload.district || existing.data!.district,
-    village: payload.village || existing.data!.village,
-    bankName: payload.bank_name || existing.data!.bankName,
-    bankAccountNo: payload.bank_account_no || existing.data!.bankAccountNo,
-    bankAccountName: payload.bank_account_name || existing.data!.bankAccountName,
+    idCard: cleanId,
+    province: payload.province,
+    district: payload.district,
+    village: payload.village,
+    bankName: payload.bank_name,
+    bankAccountNo: payload.bank_account_no,
+    bankAccountName: payload.bank_account_name,
     registrationStatus: 'pending_leader',
   }
+
   return { data: authUser, error: null, source: 'supabase' }
 }
-
 // ── Admin Members (fetchAdminMembers / approveMember / rejectMember / updateRoleGrade) ──
 
 export interface AdminMemberRow {
