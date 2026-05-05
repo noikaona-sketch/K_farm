@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, Link } from 'react-router-dom'
 import { AuthProvider, useAuth } from './routes/AuthContext'
 import { atLeast } from './lib/roles'
 import type { AppRole } from './lib/roles'
@@ -109,6 +109,58 @@ function FarmerNoBurnPage() {
   )
 }
 
+function FieldMenuCard({ to, icon, title, subtitle }: { to: string; icon: string; title: string; subtitle: string }) {
+  return (
+    <Link to={to} className="bg-white rounded-3xl p-4 shadow-sm border border-emerald-50 hover:shadow-md transition active:scale-[0.98]">
+      <div className="w-12 h-12 rounded-2xl bg-emerald-100 flex items-center justify-center text-xl mb-3">
+        <span>{icon}</span>
+      </div>
+      <div className="font-bold text-gray-800 text-sm">{title}</div>
+      <div className="text-xs text-gray-400 mt-1 leading-relaxed">{subtitle}</div>
+    </Link>
+  )
+}
+
+function FieldDashboardHome() {
+  const { user } = useAuth()
+  return (
+    <div className="min-h-screen bg-gray-50 p-4 pb-24">
+      <div className="max-w-md mx-auto space-y-4">
+        <div className="bg-white rounded-3xl p-5 shadow-sm border border-emerald-50">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-100 flex items-center justify-center text-xl">🌱</div>
+            <div>
+              <p className="text-xs text-gray-400">ทีมภาคสนาม</p>
+              <h1 className="font-bold text-gray-900 text-lg">{user?.name || 'เจ้าหน้าที่ภาคสนาม'}</h1>
+            </div>
+          </div>
+          <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+            <div className="rounded-2xl bg-emerald-50 p-3">
+              <div className="font-bold text-emerald-700">0</div>
+              <div className="text-[11px] text-gray-500">รอส่ง</div>
+            </div>
+            <div className="rounded-2xl bg-emerald-50 p-3">
+              <div className="font-bold text-emerald-700">0</div>
+              <div className="text-[11px] text-gray-500">วันนี้</div>
+            </div>
+            <div className="rounded-2xl bg-emerald-50 p-3">
+              <div className="font-bold text-emerald-700">0</div>
+              <div className="text-[11px] text-gray-500">สำเร็จ</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <FieldMenuCard to="/field/member-register" icon="👤" title="สมัครสมาชิก" subtitle="ลงทะเบียนเกษตรกรใหม่" />
+          <FieldMenuCard to="/field/seed-booking" icon="🌾" title="จองเมล็ดพันธุ์" subtitle="จองแทนสมาชิกในพื้นที่" />
+          <FieldMenuCard to="/field/farm-inspection" icon="🔍" title="ตรวจแปลง" subtitle="บันทึกผลตรวจภาคสนาม" />
+          <FieldMenuCard to="/field/no-burn" icon="🚫" title="ไม่เผา" subtitle="ตรวจและรับรองกิจกรรม" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
   return (
     <AuthProvider><LiffGuard><Routes>
@@ -136,7 +188,7 @@ export default function App() {
       </Route>
 
       <Route path="/field" element={<RequireAuth minRole="field"><MobileLayout /></RequireAuth>}>
-        <Route  index element={<div className="p-5 space-y-4"><h1 className="text-xl font-bold text-gray-900">งานภาคสนาม</h1> <p className="text-sm text-gray-500">เลือกเมนูด้านล่างเพื่อเริ่มงาน</p><div className="grid gap-3"><a href="/field/member-register" className="bg-white rounded-2xl p-5 shadow-sm border"> 👤 สมัครสมาชิก</a><a href="/field/seed-booking" className="bg-white rounded-2xl p-5 shadow-sm border">🌾 จองเมล็ดพันธุ์</a> <a href="/field/farm-inspection" className="bg-white rounded-2xl p-5 shadow-sm border">🔍 ตรวจแปลง</a> <a href="/field/no-burn" className="bg-white rounded-2xl p-5 shadow-sm border">🚫 ตรวจไม่เผา</a></div> </div> }/>
+        <Route index element={<FieldDashboardHome />} />
         <Route path="member-register" element={<RequirePermission permission="field.member_register" fallback="/field"> <FieldMemberRegister /> </RequirePermission>  }/>
         <Route path="seed-booking" element={<RequirePermission permission="field.seed_booking" fallback="/field"><FieldSeedBooking /></RequirePermission>} />
         <Route path="farm-inspection" element={<RequirePermission permission="field.farm_inspection" fallback="/field"><FieldFarmInspection /></RequirePermission>} />
