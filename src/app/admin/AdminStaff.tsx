@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { RefreshCw, Search, UserCog, Wifi, WifiOff } from 'lucide-react'
 import { supabase, isSupabaseReady } from '../../lib/supabase'
+import { DEPT_PERMISSIONS, type Permission } from '../../lib/permissions'
 
 type Department = 'agri' | 'sales' | 'stock' | 'accounting' | 'inspection' | 'service' | 'it'
 
@@ -17,6 +18,48 @@ const DEPT_LABEL: Record<Department, string> = {
   it: 'IT',
 }
 
+const PERMISSION_LABEL: Record<Permission, string> = {
+  'member.view': 'ดูสมาชิก',
+  'member.approve': 'อนุมัติสมาชิก',
+  'member.import': 'Import สมาชิก',
+  'member.set_role': 'กำหนดสิทธิ์สมาชิก',
+  'team.view': 'ดูทีมงาน',
+  'team.edit': 'แก้ไขทีมงาน',
+  'seed.view': 'ดูเมล็ดพันธุ์',
+  'seed.edit': 'แก้ไขเมล็ดพันธุ์',
+  'seed.stock': 'สต็อกเมล็ดพันธุ์',
+  'seed.sales': 'จอง/ขายเมล็ดพันธุ์',
+  'seed.debt': 'ลูกหนี้เมล็ดพันธุ์',
+  'price.view': 'ดูราคา',
+  'price.edit': 'แก้ไขราคา',
+  'inspection.view': 'ดูงานตรวจ',
+  'inspection.edit': 'แก้ไขงานตรวจ',
+  'service.view': 'ดูรถร่วม',
+  'service.edit': 'แก้ไขรถร่วม',
+  'field.view': 'ดูงานภาคสนาม',
+  'field.seed_booking': 'จองเมล็ดภาคสนาม',
+  'field.farm_inspection': 'ตรวจแปลงภาคสนาม',
+  'field.no_burn': 'กิจกรรมไม่เผา',
+  'field.member_register': 'สมัครสมาชิกภาคสนาม',
+  'field.machine_check': 'ตรวจเครื่องจักร',
+  'field.transport_check': 'ตรวจขนส่ง',
+  'report.view': 'ดูรายงาน',
+  'report.export': 'Export รายงาน',
+  'system.roles': 'จัดการ role',
+  'system.all': 'ทุกสิทธิ์',
+}
+
+const PERMISSION_GROUPS: { title: string; items: Permission[] }[] = [
+  { title: 'สมาชิก', items: ['member.view', 'member.approve', 'member.import', 'member.set_role'] },
+  { title: 'ทีมงาน', items: ['team.view', 'team.edit'] },
+  { title: 'เมล็ดพันธุ์', items: ['seed.view', 'seed.edit', 'seed.stock', 'seed.sales', 'seed.debt'] },
+  { title: 'ราคา/รายงาน', items: ['price.view', 'price.edit', 'report.view', 'report.export'] },
+  { title: 'ตรวจแปลง', items: ['inspection.view', 'inspection.edit'] },
+  { title: 'รถร่วม', items: ['service.view', 'service.edit'] },
+  { title: 'ภาคสนาม', items: ['field.view', 'field.seed_booking', 'field.farm_inspection', 'field.no_burn', 'field.member_register', 'field.machine_check', 'field.transport_check'] },
+  { title: 'ระบบ', items: ['system.roles', 'system.all'] },
+]
+
 type StaffRow = {
   id: string
   full_name: string
@@ -26,7 +69,7 @@ type StaffRow = {
   department?: Department
   level?: string
   can_fieldwork?: boolean
-  permissions?: Record<string, unknown>
+  permissions?: Permission[]
   created_at?: string
 }
 
@@ -34,15 +77,25 @@ type RowEdit = {
   department: Department
   level: string
   can_fieldwork: boolean
+  permissions: Permission[]
 }
 
 function asDepartment(value: unknown): Department {
   return departments.includes(value as Department) ? value as Department : 'agri'
 }
 
+function normalizePermissions(value: unknown, department: Department): Permission[] {
+  if (Array.isArray(value)) return value.filter((v): v is Permission => typeof v === 'string' && v in PERMISSION_LABEL)
+  return DEPT_PERMISSIONS[department] ?? []
+}
+
 function readProfile(row: Record<string, unknown>) {
   const profile = row.profiles as Record<string, unknown> | null | undefined
   return profile ?? row
+}
+
+function hasPerm(list: Permission[], perm: Permission) {
+  return list.includes('system.all') || list.includes(perm)
 }
 
 export default function AdminStaff() {
@@ -53,6 +106,7 @@ export default function AdminStaff() {
   const [search, setSearch] = useState('')
   const [filterDept, setFilterDept] = useState<'all' | Department>('all')
   const [filterFieldwork, setFilterFieldwork] = useState<'all' | 'yes' | 'no'>('all')
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [toast, setToast] = useState<{ ok: boolean; msg: string } | null>(null)
 
   const flash = (ok: boolean, msg: string) => {
@@ -77,16 +131,17 @@ export default function AdminStaff() {
 
       const mapped: StaffRow[] = (data ?? []).map((row: Record<string, unknown>) => {
         const profile = readProfile(row)
+        const department = asDepartment(row.department)
         return {
           id: String(profile.id ?? row.profile_id ?? row.id),
           full_name: String(profile.full_name ?? '-'),
           phone: String(profile.phone ?? '-'),
           role: String(profile.role ?? 'staff'),
           base_type: String(profile.base_type ?? 'staff'),
-          department: asDepartment(row.department),
+          department,
           level: String(row.level ?? 'staff'),
           can_fieldwork: Boolean(row.can_fieldwork),
-          permissions: row.permissions as Record<string, unknown> | undefined,
+          permissions: normalizePermissions(row.permissions, department),
           created_at: String(row.created_at ?? ''),
         }
       })
@@ -94,10 +149,12 @@ export default function AdminStaff() {
       setRows(mapped)
       const init: Record<string, RowEdit> = {}
       mapped.forEach(row => {
+        const department = row.department ?? 'agri'
         init[row.id] = {
-          department: row.department ?? 'agri',
+          department,
           level: row.level ?? 'staff',
           can_fieldwork: Boolean(row.can_fieldwork),
+          permissions: row.permissions?.length ? row.permissions : (DEPT_PERMISSIONS[department] ?? []),
         }
       })
       setEdits(init)
@@ -131,9 +188,28 @@ export default function AdminStaff() {
         department: prev[id]?.department ?? 'agri',
         level: prev[id]?.level ?? 'staff',
         can_fieldwork: prev[id]?.can_fieldwork ?? false,
+        permissions: prev[id]?.permissions ?? [],
         ...patch,
       },
     }))
+  }
+
+  const togglePermission = (id: string, perm: Permission, checked: boolean) => {
+    const current = edits[id]?.permissions ?? []
+    if (perm === 'system.all' && checked) {
+      setEdit(id, { permissions: ['system.all'] })
+      return
+    }
+    const withoutAll = current.filter(p => p !== 'system.all')
+    const next = checked
+      ? Array.from(new Set([...withoutAll, perm]))
+      : withoutAll.filter(p => p !== perm)
+    setEdit(id, { permissions: next })
+  }
+
+  const applyDeptDefault = (id: string) => {
+    const dept = edits[id]?.department ?? 'agri'
+    setEdit(id, { permissions: DEPT_PERMISSIONS[dept] ?? [] })
   }
 
   const save = async (id: string) => {
@@ -153,6 +229,7 @@ export default function AdminStaff() {
         department: edit.department,
         level: edit.level,
         can_fieldwork: edit.can_fieldwork,
+        permissions: edit.permissions,
       }
 
       const result = existing
@@ -163,7 +240,7 @@ export default function AdminStaff() {
 
       const { error: profileErr } = await supabase
         .from('profiles')
-        .update({ base_type: 'staff', role: 'field' })
+        .update({ base_type: 'staff', role: edit.can_fieldwork ? 'field' : 'member' })
         .eq('id', id)
       if (profileErr) throw new Error(profileErr.message)
 
@@ -221,39 +298,76 @@ export default function AdminStaff() {
                 <th className="text-center px-3 py-3">ฝ่าย</th>
                 <th className="text-center px-3 py-3">ระดับ</th>
                 <th className="text-center px-3 py-3">ภาคสนาม</th>
+                <th className="text-center px-3 py-3">สิทธิ์</th>
                 <th className="text-center px-4 py-3">บันทึก</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filtered.map(row => {
-                const edit = edits[row.id] ?? { department: row.department ?? 'agri', level: row.level ?? 'staff', can_fieldwork: Boolean(row.can_fieldwork) }
+                const edit = edits[row.id] ?? { department: row.department ?? 'agri', level: row.level ?? 'staff', can_fieldwork: Boolean(row.can_fieldwork), permissions: row.permissions ?? [] }
                 const isA = acting === row.id
                 return (
-                  <tr key={row.id} className="hover:bg-gray-50/60">
-                    <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">{row.full_name}</td>
-                    <td className="px-3 py-3 font-mono text-xs text-blue-600 whitespace-nowrap">{row.phone}</td>
-                    <td className="px-3 py-3 text-center">
-                      <select value={edit.department} onChange={e=>setEdit(row.id,{department:e.target.value as Department})} className="border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white">
-                        {departments.map(d => <option key={d} value={d}>{DEPT_LABEL[d]}</option>)}
-                      </select>
-                    </td>
-                    <td className="px-3 py-3 text-center">
-                      <select value={edit.level} onChange={e=>setEdit(row.id,{level:e.target.value})} className="border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white">
-                        {levels.map(l => <option key={l}>{l}</option>)}
-                      </select>
-                    </td>
-                    <td className="px-3 py-3 text-center">
-                      <label className="inline-flex items-center gap-1 text-xs text-gray-600 cursor-pointer">
-                        <input type="checkbox" checked={edit.can_fieldwork} onChange={e=>setEdit(row.id,{can_fieldwork:e.currentTarget.checked})} /> เปิด
-                      </label>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <button disabled={isA} onClick={()=>save(row.id)} className={`px-3 h-8 rounded-lg text-xs font-bold ${isA ? 'bg-blue-100 text-blue-300' : 'bg-blue-500 text-white hover:bg-blue-600'}`}>{isA ? 'กำลังบันทึก...' : 'บันทึก'}</button>
-                    </td>
-                  </tr>
+                  <Fragment key={row.id}>
+                    <tr className="hover:bg-gray-50/60">
+                      <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">{row.full_name}</td>
+                      <td className="px-3 py-3 font-mono text-xs text-blue-600 whitespace-nowrap">{row.phone}</td>
+                      <td className="px-3 py-3 text-center">
+                        <select value={edit.department} onChange={e=>setEdit(row.id,{department:e.target.value as Department, permissions: DEPT_PERMISSIONS[e.target.value as Department] ?? []})} className="border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white">
+                          {departments.map(d => <option key={d} value={d}>{DEPT_LABEL[d]}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        <select value={edit.level} onChange={e=>setEdit(row.id,{level:e.target.value})} className="border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white">
+                          {levels.map(l => <option key={l}>{l}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        <label className="inline-flex items-center gap-1 text-xs text-gray-600 cursor-pointer">
+                          <input type="checkbox" checked={edit.can_fieldwork} onChange={e=>setEdit(row.id,{can_fieldwork:e.currentTarget.checked})} /> เปิด
+                        </label>
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        <button type="button" onClick={() => setExpanded(prev => ({ ...prev, [row.id]: !prev[row.id] }))} className="px-3 h-8 rounded-lg text-xs font-bold bg-gray-100 text-gray-700 hover:bg-gray-200">
+                          {edit.permissions.includes('system.all') ? 'ทุกสิทธิ์' : `${edit.permissions.length} สิทธิ์`}
+                        </button>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <button disabled={isA} onClick={()=>save(row.id)} className={`px-3 h-8 rounded-lg text-xs font-bold ${isA ? 'bg-blue-100 text-blue-300' : 'bg-blue-500 text-white hover:bg-blue-600'}`}>{isA ? 'กำลังบันทึก...' : 'บันทึก'}</button>
+                      </td>
+                    </tr>
+                    {expanded[row.id] && (
+                      <tr className="bg-gray-50/60">
+                        <td colSpan={7} className="px-4 py-4">
+                          <div className="flex items-center gap-2 mb-3">
+                            <button type="button" onClick={() => applyDeptDefault(row.id)} className="px-3 py-1.5 rounded-lg bg-white border text-xs font-semibold text-gray-700 hover:bg-gray-50">ใช้ค่าเริ่มต้นตามฝ่าย</button>
+                            <button type="button" onClick={() => setEdit(row.id, { permissions: [] })} className="px-3 py-1.5 rounded-lg bg-white border text-xs font-semibold text-red-600 hover:bg-red-50">ล้างสิทธิ์</button>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+                            {PERMISSION_GROUPS.map(group => (
+                              <div key={group.title} className="bg-white rounded-xl border p-3">
+                                <div className="font-bold text-xs text-gray-700 mb-2">{group.title}</div>
+                                <div className="space-y-1.5">
+                                  {group.items.map(perm => (
+                                    <label key={perm} className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        checked={hasPerm(edit.permissions, perm)}
+                                        onChange={e => togglePermission(row.id, perm, e.currentTarget.checked)}
+                                      />
+                                      <span>{PERMISSION_LABEL[perm]}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 )
               })}
-              {filtered.length === 0 && <tr><td colSpan={6} className="text-center py-12 text-gray-400">ยังไม่มีพนักงาน</td></tr>}
+              {filtered.length === 0 && <tr><td colSpan={7} className="text-center py-12 text-gray-400">ยังไม่มีพนักงาน</td></tr>}
             </tbody>
           </table>
         </div>
