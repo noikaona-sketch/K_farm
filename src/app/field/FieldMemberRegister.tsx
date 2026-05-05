@@ -4,6 +4,7 @@ import { ArrowLeft, CheckCircle, CreditCard, MapPin, RefreshCw, Truck, UserPlus 
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../routes/AuthContext'
 import { preprocessImageForOcr } from '../../lib/imagePreprocess'
+import { runIdentityOcr, type IdentityOcrResult } from '../../lib/identityOcr'
 
 const genFarmerCode = () => `KF${Date.now().toString().slice(-6)}`
 type RegisterType = 'member' | 'vehicle'
@@ -32,7 +33,9 @@ export default function FieldMemberRegister() {
   const [driverName, setDriverName] = useState('')
   const [driverPhone, setDriverPhone] = useState('')
   const [idImage, setIdImage] = useState<{ file: File; preview: string } | null>(null)
+  const [identityOcr, setIdentityOcr] = useState<IdentityOcrResult | null>(null)
   const [saving, setSaving] = useState(false)
+  const [ocrLoading, setOcrLoading] = useState(false)
   const [ok, setOk] = useState('')
   const [error, setError] = useState('')
 
@@ -42,7 +45,7 @@ export default function FieldMemberRegister() {
     setFarmName(''); setAreaRai(''); setGpsLat(''); setGpsLng('')
     setBankName(''); setBankAccountNo(''); setBankAccountName('')
     setVehiclePlate(''); setVehicleType('6 ล้อ'); setDriverName(''); setDriverPhone('')
-    setIdImage(null)
+    setIdImage(null); setIdentityOcr(null)
   }
 
   const getGps = () => {
@@ -57,10 +60,24 @@ export default function FieldMemberRegister() {
     )
   }
 
+  const applyOcrToForm = (ocr: IdentityOcrResult) => {
+    if (ocr.full_name) {
+      setFullName(ocr.full_name)
+      setBankAccountName(ocr.full_name)
+    }
+    if (ocr.id_card) setIdCard(ocr.id_card)
+    if (ocr.address) setAddress(ocr.address)
+    if (ocr.province) setProvince(ocr.province)
+    if (ocr.district) setDistrict(ocr.district)
+    if (ocr.subdistrict) setSubdistrict(ocr.subdistrict)
+  }
+
   const handleIdImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     setError('')
+    setOk('')
+    setIdentityOcr(null)
     try {
       const processed = await preprocessImageForOcr(file, {
         maxSide: 1200,
@@ -68,16 +85,36 @@ export default function FieldMemberRegister() {
         centerCrop: true,
       })
       setIdImage({ file: processed.file, preview: processed.dataUrl })
+      setOcrLoading(true)
+      const ocr = await runIdentityOcr(processed.file)
+      setIdentityOcr(ocr)
+      applyOcrToForm(ocr)
+      setOk('อ่านข้อมูลจากบัตรแล้ว กรุณาตรวจสอบก่อนบันทึก')
     } catch (err) {
-      console.warn('[FieldMemberRegister] image preprocess failed:', err)
+      console.warn('[FieldMemberRegister] OCR failed:', err)
       setIdImage({ file, preview: URL.createObjectURL(file) })
-      setError('ย่อรูปไม่สำเร็จ ระบบจะใช้รูปต้นฉบับแทน')
+      setError(err instanceof Error ? err.message : 'อ่านข้อความจากรูปไม่สำเร็จ กรุณากรอกเอง')
+    } finally {
+      setOcrLoading(false)
     }
   }
 
-  const runOcrMock = () => {
+  const runOcr = async () => {
     if (!idImage) { setError('กรุณาถ่ายรูปบัตรก่อน'); return }
-    setOk('อ่านข้อมูล OCR ตัวอย่างแล้ว กรุณาตรวจสอบก่อนบันทึก')
+    setError('')
+    setOk('')
+    setOcrLoading(true)
+    try {
+      const ocr = await runIdentityOcr(idImage.file)
+      setIdentityOcr(ocr)
+      applyOcrToForm(ocr)
+      setOk('อ่านข้อมูลจากบัตรแล้ว กรุณาตรวจสอบก่อนบันทึก')
+    } catch (err) {
+      console.warn('[FieldMemberRegister] OCR failed:', err)
+      setError(err instanceof Error ? err.message : 'อ่านข้อความจากรูปไม่สำเร็จ กรุณากรอกเอง')
+    } finally {
+      setOcrLoading(false)
+    }
   }
 
   const saveMember = async () => {
@@ -97,10 +134,14 @@ export default function FieldMemberRegister() {
         bank_account_no: bankAccountNo || null,
         bank_account_name: bankAccountName || null,
         role: 'member',
+        base_type: 'farmer',
         registration_source: 'field',
         created_by: user?.id ?? null,
         created_by_name: user?.name ?? 'ทีมภาคสนาม',
-        id_card_ocr_json: {},
+        id_card_ocr_json: identityOcr ?? {},
+        identity_ocr_json: identityOcr ?? null,
+        identity_ocr_confidence: identityOcr?.confidence ?? null,
+        identity_ocr_raw_text: identityOcr?.raw_text ?? null,
       })
       .select('id')
       .single()
@@ -131,6 +172,14 @@ export default function FieldMemberRegister() {
 
     const ownerName = fullName.trim() || driverName.trim()
     const contactPhone = phone.trim() || driverPhone.trim()
+    const ocrJson = {
+      ...(identityOcr ?? {}),
+      vehicle_plate: vehiclePlate.trim(),
+      vehicle_type: vehicleType,
+      driver_name: driverName.trim() || ownerName,
+      driver_phone: driverPhone.trim() || contactPhone,
+      note: 'field vehicle registration',
+    }
 
     const { error: profileErr } = await supabase!
       .from('profiles')
@@ -143,16 +192,14 @@ export default function FieldMemberRegister() {
         district: district || null,
         subdistrict: subdistrict || null,
         role: 'vehicle',
+        base_type: 'service',
         registration_source: 'field_vehicle',
         created_by: user?.id ?? null,
         created_by_name: user?.name ?? 'ทีมภาคสนาม',
-        id_card_ocr_json: {
-          vehicle_plate: vehiclePlate.trim(),
-          vehicle_type: vehicleType,
-          driver_name: driverName.trim() || ownerName,
-          driver_phone: driverPhone.trim() || contactPhone,
-          note: 'field vehicle registration',
-        },
+        id_card_ocr_json: ocrJson,
+        identity_ocr_json: identityOcr ?? null,
+        identity_ocr_confidence: identityOcr?.confidence ?? null,
+        identity_ocr_raw_text: identityOcr?.raw_text ?? null,
       })
     if (profileErr) throw new Error(profileErr.message)
   }
@@ -203,7 +250,9 @@ export default function FieldMemberRegister() {
           <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleIdImageChange} />
         </label>
         {idImage && <img src={idImage.preview} className="w-full max-h-56 object-cover rounded-xl border" />}
-        <button type="button" onClick={runOcrMock} className="w-full border rounded-xl py-3 font-bold">อ่านข้อมูลจากบัตร (OCR)</button>
+        <button type="button" onClick={runOcr} disabled={ocrLoading || !idImage} className="w-full border rounded-xl py-3 font-bold disabled:opacity-50">
+          {ocrLoading ? 'กำลังอ่านข้อมูลจากบัตร...' : 'อ่านข้อมูลจากบัตร (OCR)'}
+        </button>
         <input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder={registerType === 'member' ? 'ชื่อ-นามสกุล' : 'ชื่อเจ้าของรถ'} className="w-full border rounded-xl p-3" />
         <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="เบอร์โทร" className="w-full border rounded-xl p-3" />
         <input value={idCard} onChange={(e) => setIdCard(e.target.value)} placeholder="เลขบัตรประชาชน" className="w-full border rounded-xl p-3" />
@@ -246,7 +295,7 @@ export default function FieldMemberRegister() {
         </section>
       )}
 
-      <button disabled={saving} onClick={save} className="w-full rounded-xl bg-emerald-600 disabled:bg-gray-300 text-white py-3 font-bold flex justify-center gap-2"><CheckCircle className="w-5 h-5" />{saving ? <><RefreshCw className="w-5 h-5 animate-spin" />กำลังบันทึก...</> : registerType === 'member' ? 'บันทึกสมัครสมาชิก' : 'บันทึกลงทะเบียนรถ'}</button>
+      <button disabled={saving || ocrLoading} onClick={save} className="w-full rounded-xl bg-emerald-600 disabled:bg-gray-300 text-white py-3 font-bold flex justify-center gap-2"><CheckCircle className="w-5 h-5" />{saving ? <><RefreshCw className="w-5 h-5 animate-spin" />กำลังบันทึก...</> : registerType === 'member' ? 'บันทึกสมัครสมาชิก' : 'บันทึกลงทะเบียนรถ'}</button>
     </div>
   )
 }
