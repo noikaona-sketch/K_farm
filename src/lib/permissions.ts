@@ -58,6 +58,7 @@ export const ADMIN_MENUS: AdminMenuItem[] = [
   { to: '/admin/crop-cycle', label: 'วงจรเกษตรสมาชิก', icon: '🔄', permission: 'inspection.view' },
   { to: '/admin/planting-cycle', label: 'วงจรการปลูก', icon: '🌱', permission: 'inspection.view' },
   { to: '/admin/no-burn', label: 'กิจกรรมไม่เผา', icon: '🚫', permission: 'inspection.view' },
+  { to: '/admin/inspection-final-review', label: 'อนุมัติผลตรวจ', icon: '✅', permission: 'inspection.edit' },
   { to: '/admin/calendar', label: 'ปฏิทินงานภาคสนาม', icon: '🗓️', permission: 'inspection.view' },
   { to: '/admin/field-inspections', label: 'ตรวจแปลง', icon: '🔍', permission: 'inspection.view' },
   { to: '/admin/quality', label: 'คุณภาพผลผลิต', icon: '📈', permission: 'inspection.view' },
