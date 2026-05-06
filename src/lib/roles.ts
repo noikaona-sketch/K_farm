@@ -112,6 +112,7 @@ export const ROLE_TABS: Record<AppRole, readonly { to: string; label: string; ic
   farmer: [
     { to: '/farmer', label: 'หน้าแรก', icon: '🏠', end: true },
     { to: '/farmer/planting', label: 'แจ้งปลูก', icon: '🌽', end: false },
+    { to: '/farmer/no-burn', label: 'ไม่เผา', icon: '🚫', end: false },
     { to: '/farmer/status', label: 'สถานะ', icon: '📋', end: false },
     { to: '/farmer/prices', label: 'ราคา', icon: '💰', end: false },
   ],
@@ -144,6 +145,7 @@ export const ROLE_TABS: Record<AppRole, readonly { to: string; label: string; ic
   admin: [
     { to: '/admin', label: 'Dashboard', icon: '📊', end: true },
     { to: '/admin/farmers', label: 'สมาชิก', icon: '👥', end: false },
+    { to: '/admin/no-burn', label: 'ไม่เผา', icon: '🚫', end: false },
     { to: '/admin/map', label: 'แผนที่', icon: '🗺️', end: false },
     { to: '/admin/prices', label: 'ราคา', icon: '💰', end: false },
   ],
