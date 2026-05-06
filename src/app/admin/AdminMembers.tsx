@@ -5,6 +5,7 @@ import {
 } from '../../lib/db'
 import { isSupabaseReady } from '../../lib/supabase'
 import { RefreshCw, Search, Wifi, WifiOff } from 'lucide-react'
+import AdminQuickCreate from './AdminQuickCreate'
 
 type BaseType = 'farmer' | 'service' | 'staff'
 type Grade = 'A' | 'B' | 'C'
@@ -171,10 +172,13 @@ export default function MembersPage() {
             <span className="text-gray-400">• แสดงเฉพาะ farmer • {total} รายการ</span>
           </div>
         </div>
-        <button onClick={()=>{setLoading(true);load()}}
-          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm hover:bg-gray-50 shadow-sm">
-          <RefreshCw className="w-4 h-4"/>รีโหลด
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <AdminQuickCreate mode="member" onDone={load} />
+          <button onClick={()=>{setLoading(true);load()}}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm hover:bg-gray-50 shadow-sm">
+            <RefreshCw className="w-4 h-4"/>รีโหลด
+          </button>
+        </div>
       </div>
 
       {toast && (
