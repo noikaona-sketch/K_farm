@@ -2,12 +2,18 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 import { RefreshCw, Search, UserCog, Wifi, WifiOff } from 'lucide-react'
 import { supabase, isSupabaseReady } from '../../lib/supabase'
 import { DEPT_PERMISSIONS, type Permission } from '../../lib/permissions'
+import type { Capability } from '../../lib/roles'
 import AdminQuickCreate from './AdminQuickCreate'
 
 type Department = 'agri' | 'sales' | 'stock' | 'accounting' | 'inspection' | 'service' | 'it'
 
 const departments: Department[] = ['agri', 'sales', 'stock', 'accounting', 'inspection', 'service', 'it']
 const levels = ['staff', 'supervisor', 'manager', 'admin']
+const CAPABILITY_OPTIONS: { value: Capability; label: string }[] = [
+  { value: 'can_inspect', label: 'ผู้ตรวจทั่วไป' },
+  { value: 'can_inspect_no_burn', label: 'ตรวจไม่เผา' },
+  { value: 'manage_all', label: 'Admin เต็มระบบ' },
+]
 
 const DEPT_LABEL: Record<Department, string> = {
   agri: 'เกษตร',
@@ -71,6 +77,7 @@ type StaffRow = {
   level?: string
   can_fieldwork?: boolean
   permissions?: Permission[]
+  capabilities?: Capability[]
   created_at?: string
 }
 
@@ -79,6 +86,7 @@ type RowEdit = {
   level: string
   can_fieldwork: boolean
   permissions: Permission[]
+  capabilities: Capability[]
 }
 
 function asDepartment(value: unknown): Department {
@@ -90,6 +98,13 @@ function normalizePermissions(value: unknown, department: Department): Permissio
   return DEPT_PERMISSIONS[department] ?? []
 }
 
+function normalizeCapabilities(value: unknown): Capability[] {
+  if (!Array.isArray(value)) return []
+  return value.filter((v): v is Capability =>
+    v === 'is_leader' || v === 'can_inspect' || v === 'can_inspect_no_burn' || v === 'manage_all'
+  )
+}
+
 function readProfile(row: Record<string, unknown>) {
   const profile = row.profiles as Record<string, unknown> | null | undefined
   return profile ?? row
@@ -97,6 +112,10 @@ function readProfile(row: Record<string, unknown>) {
 
 function hasPerm(list: Permission[], perm: Permission) {
   return list.includes('system.all') || list.includes(perm)
+}
+
+function toggle<T extends string>(list: T[], item: T) {
+  return list.includes(item) ? list.filter(v => v !== item) : [...list, item]
 }
 
 export default function AdminStaff() {
@@ -125,7 +144,7 @@ export default function AdminStaff() {
 
       const { data, error } = await supabase
         .from('staff_profiles')
-        .select('id, profile_id, department, level, can_fieldwork, permissions, created_at, profiles(id, full_name, phone, role, base_type)')
+        .select('id, profile_id, department, level, can_fieldwork, permissions, created_at, profiles(id, full_name, phone, role, base_type, capabilities)')
         .order('created_at', { ascending: false })
 
       if (error) throw new Error(error.message)
@@ -143,6 +162,7 @@ export default function AdminStaff() {
           level: String(row.level ?? 'staff'),
           can_fieldwork: Boolean(row.can_fieldwork),
           permissions: normalizePermissions(row.permissions, department),
+          capabilities: normalizeCapabilities(profile.capabilities),
           created_at: String(row.created_at ?? ''),
         }
       })
@@ -156,6 +176,7 @@ export default function AdminStaff() {
           level: row.level ?? 'staff',
           can_fieldwork: Boolean(row.can_fieldwork),
           permissions: row.permissions?.length ? row.permissions : (DEPT_PERMISSIONS[department] ?? []),
+          capabilities: row.capabilities ?? [],
         }
       })
       setEdits(init)
@@ -190,6 +211,7 @@ export default function AdminStaff() {
         level: prev[id]?.level ?? 'staff',
         can_fieldwork: prev[id]?.can_fieldwork ?? false,
         permissions: prev[id]?.permissions ?? [],
+        capabilities: prev[id]?.capabilities ?? [],
         ...patch,
       },
     }))
@@ -206,6 +228,11 @@ export default function AdminStaff() {
       ? Array.from(new Set([...withoutAll, perm]))
       : withoutAll.filter(p => p !== perm)
     setEdit(id, { permissions: next })
+  }
+
+  const toggleCapability = (id: string, cap: Capability) => {
+    const current = edits[id]?.capabilities ?? []
+    setEdit(id, { capabilities: toggle(current, cap) as Capability[] })
   }
 
   const applyDeptDefault = (id: string) => {
@@ -231,6 +258,7 @@ export default function AdminStaff() {
         level: edit.level,
         can_fieldwork: edit.can_fieldwork,
         permissions: edit.permissions,
+        updated_at: new Date().toISOString(),
       }
 
       const result = existing
@@ -239,9 +267,24 @@ export default function AdminStaff() {
 
       if (result.error) throw new Error(result.error.message)
 
+      const role = edit.capabilities.includes('manage_all')
+        ? 'admin'
+        : edit.can_fieldwork
+          ? 'field'
+          : edit.capabilities.includes('can_inspect') || edit.capabilities.includes('can_inspect_no_burn')
+            ? 'inspector'
+            : 'member'
+
       const { error: profileErr } = await supabase
         .from('profiles')
-        .update({ base_type: 'staff', role: edit.can_fieldwork ? 'field' : 'member' })
+        .update({
+          base_type: 'staff',
+          role,
+          capabilities: edit.capabilities,
+          department: edit.department,
+          permissions: edit.permissions,
+          updated_at: new Date().toISOString(),
+        })
         .eq('id', id)
       if (profileErr) throw new Error(profileErr.message)
 
@@ -301,14 +344,20 @@ export default function AdminStaff() {
                 <th className="text-left px-3 py-3">โทร</th>
                 <th className="text-center px-3 py-3">ฝ่าย</th>
                 <th className="text-center px-3 py-3">ระดับ</th>
-                <th className="text-center px-3 py-3">ภาคสนาม</th>
+                <th className="text-center px-3 py-3">Capability</th>
                 <th className="text-center px-3 py-3">สิทธิ์</th>
                 <th className="text-center px-4 py-3">บันทึก</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filtered.map(row => {
-                const edit = edits[row.id] ?? { department: row.department ?? 'agri', level: row.level ?? 'staff', can_fieldwork: Boolean(row.can_fieldwork), permissions: row.permissions ?? [] }
+                const edit = edits[row.id] ?? {
+                  department: row.department ?? 'agri',
+                  level: row.level ?? 'staff',
+                  can_fieldwork: Boolean(row.can_fieldwork),
+                  permissions: row.permissions ?? [],
+                  capabilities: row.capabilities ?? [],
+                }
                 const isA = acting === row.id
                 return (
                   <Fragment key={row.id}>
@@ -325,10 +374,17 @@ export default function AdminStaff() {
                           {levels.map(l => <option key={l}>{l}</option>)}
                         </select>
                       </td>
-                      <td className="px-3 py-3 text-center">
-                        <label className="inline-flex items-center gap-1 text-xs text-gray-600 cursor-pointer">
-                          <input type="checkbox" checked={edit.can_fieldwork} onChange={e=>setEdit(row.id,{can_fieldwork:e.currentTarget.checked})} /> เปิด
-                        </label>
+                      <td className="px-3 py-3 text-center min-w-52">
+                        <div className="grid grid-cols-1 gap-1 text-xs text-gray-600">
+                          <label className="flex items-center justify-center gap-1 cursor-pointer">
+                            <input type="checkbox" checked={edit.can_fieldwork} onChange={e=>setEdit(row.id,{can_fieldwork:e.currentTarget.checked})} /> ภาคสนาม
+                          </label>
+                          {CAPABILITY_OPTIONS.map(opt => (
+                            <label key={opt.value} className="flex items-center justify-center gap-1 cursor-pointer">
+                              <input type="checkbox" checked={edit.capabilities.includes(opt.value)} onChange={() => toggleCapability(row.id, opt.value)} /> {opt.label}
+                            </label>
+                          ))}
+                        </div>
                       </td>
                       <td className="px-3 py-3 text-center">
                         <button type="button" onClick={() => setExpanded(prev => ({ ...prev, [row.id]: !prev[row.id] }))} className="px-3 h-8 rounded-lg text-xs font-bold bg-gray-100 text-gray-700 hover:bg-gray-200">
