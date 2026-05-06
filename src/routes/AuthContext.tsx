@@ -134,12 +134,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
-    if (!supabase) return
+    const client = supabase
+    if (!client) return
     let isMounted = true
 
     const syncSession = async () => {
       try {
-        const { data } = await supabase.auth.getSession()
+        const { data } = await client.auth.getSession()
         const authUser = data.session?.user
         if (!authUser) return
         const profile = await getProfileByAuthUserId(authUser.id)
@@ -155,7 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     void syncSession()
 
-    const { data: subscription } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: subscription } = client.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT' || !session?.user) {
         setUser(null)
         persist(null)
