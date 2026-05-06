@@ -69,21 +69,13 @@ async function findExistingProfile(input: Pick<UpsertProfileInput, 'idCard' | 'p
   const phone = cleanPhone(input.phone)
 
   if (idCard) {
-    const { data, error } = await db
-      .from('profiles')
-      .select('*')
-      .eq('id_card', idCard)
-      .maybeSingle()
+    const { data, error } = await db.from('profiles').select('*').eq('id_card', idCard).maybeSingle()
     if (error) throw new Error(error.message)
     if (data) return data as Record<string, unknown>
   }
 
   if (phone) {
-    const { data, error } = await db
-      .from('profiles')
-      .select('*')
-      .eq('phone', phone)
-      .maybeSingle()
+    const { data, error } = await db.from('profiles').select('*').eq('phone', phone).maybeSingle()
     if (error) throw new Error(error.message)
     if (data) return data as Record<string, unknown>
   }
@@ -114,23 +106,24 @@ export async function upsertProfile(input: UpsertProfileInput) {
   }
 
   if (existing?.id) {
-    const { data, error } = await db
-      .from('profiles')
-      .update(payload)
-      .eq('id', existing.id)
-      .select('*')
-      .single()
-    if (error) throw new Error(error.message)
+    const { data, error } = await db.from('profiles').update(payload).eq('id', existing.id).select('*').single()
+    if (error) throw new Error(`profiles update failed: ${error.message}`)
+    if (!data?.id) throw new Error('profiles update failed: no profile returned')
     return { profile: data as Record<string, unknown>, mode: 'updated' as const }
   }
 
-  const { data, error } = await db
-    .from('profiles')
-    .insert(payload)
-    .select('*')
-    .single()
-  if (error) throw new Error(error.message)
+  const { data, error } = await db.from('profiles').insert(payload).select('*').single()
+  if (error) throw new Error(`profiles insert failed: ${error.message}`)
+  if (!data?.id) throw new Error('profiles insert failed: no profile returned')
   return { profile: data as Record<string, unknown>, mode: 'created' as const }
+}
+
+async function requireProfileExists(profileId: string) {
+  const db = requireSupabase()
+  const { data, error } = await db.from('profiles').select('id, base_type, role, capabilities').eq('id', profileId).maybeSingle()
+  if (error) throw new Error(`profiles verify failed: ${error.message}`)
+  if (!data?.id) throw new Error(`profiles verify failed: profile ${profileId} not found`)
+  return data as Record<string, unknown>
 }
 
 export async function createAdminMember(input: CreateMemberInput) {
@@ -143,14 +136,12 @@ export async function createAdminMember(input: CreateMemberInput) {
     status: input.status ?? 'pending_leader',
   })
 
+  const db = requireSupabase()
+  const profileId = String(profile.id)
+  await requireProfileExists(profileId)
+
   if (input.createFarmerRow ?? true) {
-    const db = requireSupabase()
-    const profileId = String(profile.id)
-    const { data: existingFarmer, error: findErr } = await db
-      .from('farmers')
-      .select('id')
-      .eq('profile_id', profileId)
-      .maybeSingle()
+    const { data: existingFarmer, error: findErr } = await db.from('farmers').select('id').eq('profile_id', profileId).maybeSingle()
     if (findErr) throw new Error(findErr.message)
 
     const farmerPayload = {
@@ -177,23 +168,20 @@ export async function createAdminMember(input: CreateMemberInput) {
 }
 
 export async function createAdminVehicle(input: CreateVehicleInput) {
-  const capabilities = input.capabilities ?? []
   const { profile, mode } = await upsertProfile({
     ...input,
     role: input.role ?? 'service',
     baseType: 'service',
     grade: input.grade ?? 'C',
-    capabilities,
+    capabilities: input.capabilities ?? [],
     status: input.status ?? 'pending',
   })
 
   const db = requireSupabase()
   const profileId = String(profile.id)
-  const { data: existing, error: findErr } = await db
-    .from('service_providers')
-    .select('id')
-    .eq('profile_id', profileId)
-    .maybeSingle()
+  await requireProfileExists(profileId)
+
+  const { data: existing, error: findErr } = await db.from('service_providers').select('id').eq('profile_id', profileId).maybeSingle()
   if (findErr) throw new Error(findErr.message)
 
   const servicePayload = {
@@ -216,30 +204,25 @@ export async function createAdminVehicle(input: CreateVehicleInput) {
     if (error) throw new Error(error.message)
   }
 
-  // Preserve vehicle_size in profiles json-friendly columns if the DB has no service_providers.vehicle_size column.
-  if (input.vehicleSize) {
-    const { data: current } = await db.from('profiles').select('id_card_ocr_json').eq('id', profileId).maybeSingle()
-    const currentJson = (current?.id_card_ocr_json ?? {}) as Record<string, unknown>
-    await db.from('profiles').update({
-      id_card_ocr_json: {
-        ...currentJson,
-        vehicle_type: input.vehicleType,
-        vehicle_size: input.vehicleSize,
-        license_plate: input.licensePlate ?? null,
-      },
-    }).eq('id', profileId)
-  }
-
   return { profile, mode }
 }
 
 export async function createAdminStaff(input: CreateStaffInput) {
+  const capabilities = input.capabilities ?? []
+  const role = capabilities.includes('manage_all')
+    ? 'admin'
+    : input.canFieldwork
+      ? 'field'
+      : capabilities.includes('can_inspect') || capabilities.includes('can_inspect_no_burn')
+        ? 'inspector'
+        : (input.role ?? 'field')
+
   const { profile, mode } = await upsertProfile({
     ...input,
-    role: input.role ?? 'field',
+    role,
     baseType: 'staff',
     grade: input.grade ?? 'C',
-    capabilities: input.capabilities ?? [],
+    capabilities,
     department: input.department,
     permissions: input.permissions,
     status: input.status ?? 'approved',
@@ -247,11 +230,12 @@ export async function createAdminStaff(input: CreateStaffInput) {
 
   const db = requireSupabase()
   const profileId = String(profile.id)
-  const { data: existing, error: findErr } = await db
-    .from('staff_profiles')
-    .select('id')
-    .eq('profile_id', profileId)
-    .maybeSingle()
+  const verifiedProfile = await requireProfileExists(profileId)
+  if (verifiedProfile.base_type !== 'staff') {
+    throw new Error(`profiles sync failed: profile ${profileId} base_type is not staff`)
+  }
+
+  const { data: existing, error: findErr } = await db.from('staff_profiles').select('id').eq('profile_id', profileId).maybeSingle()
   if (findErr) throw new Error(findErr.message)
 
   const staffPayload = {
@@ -265,11 +249,12 @@ export async function createAdminStaff(input: CreateStaffInput) {
 
   if (existing?.id) {
     const { error } = await db.from('staff_profiles').update(staffPayload).eq('id', existing.id)
-    if (error) throw new Error(error.message)
+    if (error) throw new Error(`staff_profiles update failed: ${error.message}`)
   } else {
     const { error } = await db.from('staff_profiles').insert(staffPayload)
-    if (error) throw new Error(error.message)
+    if (error) throw new Error(`staff_profiles insert failed: ${error.message}`)
   }
 
+  await requireProfileExists(profileId)
   return { profile, mode }
 }
