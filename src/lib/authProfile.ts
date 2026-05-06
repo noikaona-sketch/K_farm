@@ -22,6 +22,15 @@ function asGrade(value: unknown): Grade | undefined {
   return value === 'A' || value === 'B' || value === 'C' ? value : undefined
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      window.setTimeout(() => reject(new Error(message)), ms)
+    }),
+  ])
+}
+
 export function mapProfileToAuthUser(profile: Record<string, unknown>): AuthUser {
   return {
     id: String(profile.id),
@@ -50,11 +59,17 @@ export function mapProfileToAuthUser(profile: Record<string, unknown>): AuthUser
 
 export async function getProfileByAuthUserId(authUserId: string) {
   const db = requireSupabase()
-  const { data, error } = await db
+  const query = db
     .from('profiles')
     .select('*')
     .eq('auth_user_id', authUserId)
     .maybeSingle()
+
+  const { data, error } = await withTimeout(
+    query,
+    12000,
+    'โหลด profile จาก auth_user_id ไม่สำเร็จภายในเวลาที่กำหนด',
+  )
 
   if (error) throw new Error(error.message)
   return data ? mapProfileToAuthUser(data as Record<string, unknown>) : null
@@ -62,7 +77,12 @@ export async function getProfileByAuthUserId(authUserId: string) {
 
 export async function signInAdminWithPassword(email: string, password: string) {
   const db = requireSupabase()
-  const { data, error } = await db.auth.signInWithPassword({ email, password })
+  const { data, error } = await withTimeout(
+    db.auth.signInWithPassword({ email, password }),
+    12000,
+    'เข้าสู่ระบบ Supabase Auth ไม่สำเร็จภายในเวลาที่กำหนด',
+  )
+
   if (error) throw new Error(error.message)
   if (!data.user) throw new Error('ไม่พบผู้ใช้จาก Supabase Auth')
 
@@ -77,7 +97,11 @@ export async function signInAdminWithPassword(email: string, password: string) {
 
 export async function getCurrentAuthProfile() {
   if (!supabase) return null
-  const { data, error } = await supabase.auth.getSession()
+  const { data, error } = await withTimeout(
+    supabase.auth.getSession(),
+    12000,
+    'โหลด session ไม่สำเร็จภายในเวลาที่กำหนด',
+  )
   if (error) throw new Error(error.message)
   const user = data.session?.user
   if (!user) return null
