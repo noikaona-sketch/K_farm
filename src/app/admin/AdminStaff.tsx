@@ -258,6 +258,10 @@ export default function AdminStaff() {
     }))
   }
 
+  const openEdit = (id: string) => {
+    setExpanded(prev => ({ ...prev, [id]: !prev[id] }))
+  }
+
   const togglePermission = (id: string, perm: Permission, checked: boolean) => {
     const current = edits[id]?.permissions ?? []
     if (perm === 'system.all' && checked) {
@@ -408,22 +412,8 @@ export default function AdminStaff() {
                     <tr className="hover:bg-emerald-50/30 transition-colors">
                       <td className="px-5 py-4 font-semibold text-gray-900 whitespace-nowrap">{row.full_name}</td>
                       <td className="px-4 py-4 font-mono text-xs text-blue-600 whitespace-nowrap">{row.phone}</td>
-                      <td className="px-4 py-4 text-center">
-                        <div className="space-y-2">
-                          <Pill className={DEPT_BADGE[edit.department]}>{DEPT_LABEL[edit.department]}</Pill>
-                          <select value={edit.department} onChange={e=>setEdit(row.id,{department:e.target.value as Department, permissions: DEPT_PERMISSIONS[e.target.value as Department] ?? []})} className="block mx-auto border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:border-emerald-500">
-                            {departments.map(d => <option key={d} value={d}>{DEPT_LABEL[d]}</option>)}
-                          </select>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 text-center">
-                        <div className="space-y-2">
-                          <Pill className={LEVEL_BADGE[edit.level] ?? LEVEL_BADGE.staff}>{edit.level}</Pill>
-                          <select value={edit.level} onChange={e=>setEdit(row.id,{level:e.target.value})} className="block mx-auto border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:border-emerald-500">
-                            {levels.map(l => <option key={l}>{l}</option>)}
-                          </select>
-                        </div>
-                      </td>
+                      <td className="px-4 py-4 text-center"><Pill className={DEPT_BADGE[edit.department]}>{DEPT_LABEL[edit.department]}</Pill></td>
+                      <td className="px-4 py-4 text-center"><Pill className={LEVEL_BADGE[edit.level] ?? LEVEL_BADGE.staff}>{edit.level}</Pill></td>
                       <td className="px-4 py-4 min-w-56">
                         <div className="flex flex-wrap gap-1.5">
                           {edit.can_fieldwork && <Pill className="bg-emerald-50 text-emerald-700 border-emerald-200">ภาคสนาม</Pill>}
@@ -432,63 +422,83 @@ export default function AdminStaff() {
                           ))}
                           {!edit.can_fieldwork && edit.capabilities.length === 0 && <span className="text-xs text-gray-400">—</span>}
                         </div>
-                        <button type="button" onClick={() => setExpanded(prev => ({ ...prev, [row.id]: !prev[row.id] }))} className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-800">
-                          <Settings2 className="w-3.5 h-3.5" /> แก้สิทธิ์/ความสามารถ
-                        </button>
                       </td>
                       <td className="px-4 py-4 text-center">
-                        <button type="button" onClick={() => setExpanded(prev => ({ ...prev, [row.id]: !prev[row.id] }))} className="px-3 h-8 rounded-lg text-xs font-bold bg-gray-100 text-gray-700 hover:bg-gray-200">
+                        <span className="px-3 h-8 inline-flex items-center rounded-lg text-xs font-bold bg-gray-100 text-gray-700">
                           {edit.permissions.includes('system.all') ? 'ทุกสิทธิ์' : `${edit.permissions.length} สิทธิ์`}
-                        </button>
+                        </span>
                       </td>
                       <td className="px-5 py-4 text-center">
-                        {dirty ? (
-                          <button disabled={isA} onClick={()=>save(row.id)} className={`px-3 h-8 rounded-lg text-xs font-bold ${isA ? 'bg-blue-100 text-blue-300' : 'bg-blue-500 text-white hover:bg-blue-600'}`}>{isA ? 'กำลังบันทึก...' : 'บันทึก'}</button>
-                        ) : (
-                          <span className="text-xs text-gray-400">บันทึกแล้ว</span>
-                        )}
+                        <button type="button" onClick={() => openEdit(row.id)} className="inline-flex items-center gap-1.5 px-3 h-8 rounded-lg text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700">
+                          <Settings2 className="w-3.5 h-3.5" /> แก้ไข
+                        </button>
                       </td>
                     </tr>
                     {expanded[row.id] && (
                       <tr className="bg-gray-50/70">
                         <td colSpan={7} className="px-5 py-4">
-                          <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4">
-                            <div className="bg-white rounded-xl border p-3">
-                              <div className="font-bold text-xs text-gray-700 mb-3">ความสามารถ</div>
-                              <div className="space-y-2">
-                                <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
-                                  <input type="checkbox" checked={edit.can_fieldwork} onChange={e=>setEdit(row.id,{can_fieldwork:e.currentTarget.checked})} /> ภาคสนาม
-                                </label>
-                                {CAPABILITY_OPTIONS.map(opt => (
-                                  <label key={opt.value} className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
-                                    <input type="checkbox" checked={edit.capabilities.includes(opt.value)} onChange={() => toggleCapability(row.id, opt.value)} /> {opt.label}
-                                  </label>
-                                ))}
+                          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 space-y-4">
+                            <div className="flex items-center justify-between gap-3 flex-wrap">
+                              <div>
+                                <div className="font-bold text-gray-900">แก้ไขข้อมูลพนักงาน</div>
+                                <div className="text-xs text-gray-500">{row.full_name} • {row.phone}</div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {dirty && <span className="text-xs font-semibold text-amber-600">มีการเปลี่ยนแปลง</span>}
+                                <button type="button" onClick={() => setExpanded(prev => ({ ...prev, [row.id]: false }))} className="px-3 h-8 rounded-lg bg-white border text-xs font-semibold text-gray-600 hover:bg-gray-50">ปิด</button>
+                                <button disabled={!dirty || isA} onClick={()=>save(row.id)} className={`px-3 h-8 rounded-lg text-xs font-bold ${!dirty ? 'bg-gray-100 text-gray-400 cursor-default' : isA ? 'bg-blue-100 text-blue-300' : 'bg-blue-500 text-white hover:bg-blue-600'}`}>{isA ? 'กำลังบันทึก...' : 'บันทึก'}</button>
                               </div>
                             </div>
-                            <div>
-                              <div className="flex flex-wrap items-center gap-2 mb-3">
-                                <button type="button" onClick={() => applyDeptDefault(row.id)} className="px-3 py-1.5 rounded-lg bg-white border text-xs font-semibold text-gray-700 hover:bg-gray-50">ใช้ค่าเริ่มต้นตามฝ่าย</button>
-                                <button type="button" onClick={() => setEdit(row.id, { permissions: [] })} className="px-3 py-1.5 rounded-lg bg-white border text-xs font-semibold text-red-600 hover:bg-red-50">ล้างสิทธิ์</button>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <label className="text-xs font-semibold text-gray-600">
+                                ฝ่าย
+                                <select value={edit.department} onChange={e=>setEdit(row.id,{department:e.target.value as Department, permissions: DEPT_PERMISSIONS[e.target.value as Department] ?? []})} className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:border-emerald-500">
+                                  {departments.map(d => <option key={d} value={d}>{DEPT_LABEL[d]}</option>)}
+                                </select>
+                              </label>
+                              <label className="text-xs font-semibold text-gray-600">
+                                ระดับ
+                                <select value={edit.level} onChange={e=>setEdit(row.id,{level:e.target.value})} className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:border-emerald-500">
+                                  {levels.map(l => <option key={l}>{l}</option>)}
+                                </select>
+                              </label>
+                            </div>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4">
+                              <div className="rounded-xl border p-3">
+                                <div className="font-bold text-xs text-gray-700 mb-3">ความสามารถ</div>
+                                <div className="space-y-2">
+                                  <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                                    <input type="checkbox" checked={edit.can_fieldwork} onChange={e=>setEdit(row.id,{can_fieldwork:e.currentTarget.checked})} /> ภาคสนาม
+                                  </label>
+                                  {CAPABILITY_OPTIONS.map(opt => (
+                                    <label key={opt.value} className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                                      <input type="checkbox" checked={edit.capabilities.includes(opt.value)} onChange={() => toggleCapability(row.id, opt.value)} /> {opt.label}
+                                    </label>
+                                  ))}
+                                </div>
                               </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-                                {PERMISSION_GROUPS.map(group => (
-                                  <div key={group.title} className="bg-white rounded-xl border p-3">
-                                    <div className="font-bold text-xs text-gray-700 mb-2">{group.title}</div>
-                                    <div className="space-y-1.5">
-                                      {group.items.map(perm => (
-                                        <label key={perm} className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
-                                          <input
-                                            type="checkbox"
-                                            checked={hasPerm(edit.permissions, perm)}
-                                            onChange={e => togglePermission(row.id, perm, e.currentTarget.checked)}
-                                          />
-                                          <span>{PERMISSION_LABEL[perm]}</span>
-                                        </label>
-                                      ))}
+                              <div>
+                                <div className="flex flex-wrap items-center gap-2 mb-3">
+                                  <button type="button" onClick={() => applyDeptDefault(row.id)} className="px-3 py-1.5 rounded-lg bg-white border text-xs font-semibold text-gray-700 hover:bg-gray-50">ใช้ค่าเริ่มต้นตามฝ่าย</button>
+                                  <button type="button" onClick={() => setEdit(row.id, { permissions: [] })} className="px-3 py-1.5 rounded-lg bg-white border text-xs font-semibold text-red-600 hover:bg-red-50">ล้างสิทธิ์</button>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+                                  {PERMISSION_GROUPS.map(group => (
+                                    <div key={group.title} className="rounded-xl border p-3">
+                                      <div className="font-bold text-xs text-gray-700 mb-2">{group.title}</div>
+                                      <div className="space-y-1.5">
+                                        {group.items.map(perm => (
+                                          <label key={perm} className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                                            <input type="checkbox" checked={hasPerm(edit.permissions, perm)} onChange={e => togglePermission(row.id, perm, e.currentTarget.checked)} />
+                                            <span>{PERMISSION_LABEL[perm]}</span>
+                                          </label>
+                                        ))}
+                                      </div>
                                     </div>
-                                  </div>
-                                ))}
+                                  ))}
+                                </div>
                               </div>
                             </div>
                           </div>
