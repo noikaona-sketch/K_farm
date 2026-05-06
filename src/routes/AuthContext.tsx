@@ -121,10 +121,15 @@ const Ctx = createContext<AuthCtx>({
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(loadStored)
 
-  const login = (u: AuthUser) => {
-    const normalized = normalizeUser(u)
+  const applyProfile = (profile: AuthUser | null) => {
+    if (!profile) return
+    const normalized = normalizeUser(profile)
     setUser(normalized)
     persist(normalized)
+  }
+
+  const login = (u: AuthUser) => {
+    applyProfile(u)
   }
 
   const logout = () => {
@@ -138,17 +143,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!client) return
     let isMounted = true
 
+    const loadProfileForAuthUser = (authUserId: string) => {
+      void getProfileByAuthUserId(authUserId)
+        .then(profile => {
+          if (profile && isMounted) applyProfile(profile)
+        })
+        .catch(err => console.warn('[AuthContext] profile load failed:', err))
+    }
+
     const syncSession = async () => {
       try {
         const { data } = await client.auth.getSession()
         const authUser = data.session?.user
-        if (!authUser) return
-        const profile = await getProfileByAuthUserId(authUser.id)
-        if (profile && isMounted) {
-          const normalized = normalizeUser(profile)
-          setUser(normalized)
-          persist(normalized)
-        }
+        if (authUser) loadProfileForAuthUser(authUser.id)
       } catch (err) {
         console.warn('[AuthContext] session sync failed:', err)
       }
@@ -156,23 +163,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     void syncSession()
 
-    const { data: subscription } = client.auth.onAuthStateChange(async (event, session) => {
+    const { data: subscription } = client.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT' || !session?.user) {
         setUser(null)
         persist(null)
         return
       }
 
-      try {
-        const profile = await getProfileByAuthUserId(session.user.id)
-        if (profile) {
-          const normalized = normalizeUser(profile)
-          setUser(normalized)
-          persist(normalized)
-        }
-      } catch (err) {
-        console.warn('[AuthContext] auth state profile load failed:', err)
-      }
+      window.setTimeout(() => {
+        if (session.user?.id) loadProfileForAuthUser(session.user.id)
+      }, 0)
     })
 
     return () => {
