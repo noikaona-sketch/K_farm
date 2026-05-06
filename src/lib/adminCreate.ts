@@ -8,6 +8,7 @@ export interface UpsertProfileInput {
   fullName: string
   phone?: string
   idCard?: string
+  email?: string
   role?: string
   baseType?: BaseType
   capabilities?: Capability[]
@@ -59,14 +60,19 @@ function cleanPhone(value?: string | null) {
   return cleanText(value)?.replace(/[-\s]/g, '') ?? null
 }
 
+function cleanEmail(value?: string | null) {
+  return cleanText(value)?.toLowerCase() ?? null
+}
+
 function genFarmerCode() {
   return `KF${Date.now().toString().slice(-6)}`
 }
 
-async function findExistingProfile(input: Pick<UpsertProfileInput, 'idCard' | 'phone'>) {
+async function findExistingProfile(input: Pick<UpsertProfileInput, 'idCard' | 'phone' | 'email'>) {
   const db = requireSupabase()
   const idCard = cleanIdCard(input.idCard)
   const phone = cleanPhone(input.phone)
+  const email = cleanEmail(input.email)
 
   if (idCard) {
     const { data, error } = await db.from('profiles').select('*').eq('id_card', idCard).maybeSingle()
@@ -76,6 +82,12 @@ async function findExistingProfile(input: Pick<UpsertProfileInput, 'idCard' | 'p
 
   if (phone) {
     const { data, error } = await db.from('profiles').select('*').eq('phone', phone).maybeSingle()
+    if (error) throw new Error(error.message)
+    if (data) return data as Record<string, unknown>
+  }
+
+  if (email) {
+    const { data, error } = await db.from('profiles').select('*').eq('email', email).maybeSingle()
     if (error) throw new Error(error.message)
     if (data) return data as Record<string, unknown>
   }
@@ -90,6 +102,7 @@ export async function upsertProfile(input: UpsertProfileInput) {
     full_name: input.fullName.trim(),
     phone: cleanPhone(input.phone),
     id_card: cleanIdCard(input.idCard),
+    email: cleanEmail(input.email),
     role: input.role ?? 'member',
     base_type: input.baseType ?? 'farmer',
     capabilities: input.capabilities ?? [],
@@ -226,6 +239,12 @@ export async function createAdminStaff(input: CreateStaffInput) {
     department: input.department,
     permissions: input.permissions,
     status: input.status ?? 'approved',
+    // staff profile uses email for login; address/location is optional and usually blank
+    address: input.address ?? '',
+    province: input.province ?? '',
+    district: input.district ?? '',
+    subdistrict: input.subdistrict ?? '',
+    village: input.village ?? '',
   })
 
   const db = requireSupabase()
