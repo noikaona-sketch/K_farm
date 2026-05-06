@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
-import { RefreshCw, Search, UserCog, Wifi, WifiOff } from 'lucide-react'
+import { RefreshCw, Search, UserCog, Wifi, WifiOff, Settings2 } from 'lucide-react'
 import { supabase, isSupabaseReady } from '../../lib/supabase'
 import { DEPT_PERMISSIONS, type Permission } from '../../lib/permissions'
 import type { Capability } from '../../lib/roles'
@@ -9,10 +9,10 @@ type Department = 'agri' | 'sales' | 'stock' | 'accounting' | 'inspection' | 'se
 
 const departments: Department[] = ['agri', 'sales', 'stock', 'accounting', 'inspection', 'service', 'it']
 const levels = ['staff', 'supervisor', 'manager', 'admin']
-const CAPABILITY_OPTIONS: { value: Capability; label: string }[] = [
-  { value: 'can_inspect', label: 'ผู้ตรวจทั่วไป' },
-  { value: 'can_inspect_no_burn', label: 'ตรวจไม่เผา' },
-  { value: 'manage_all', label: 'Admin เต็มระบบ' },
+const CAPABILITY_OPTIONS: { value: Capability; label: string; short: string }[] = [
+  { value: 'can_inspect', label: 'ผู้ตรวจทั่วไป', short: 'ตรวจ' },
+  { value: 'can_inspect_no_burn', label: 'ตรวจไม่เผา', short: 'ไม่เผา' },
+  { value: 'manage_all', label: 'Admin เต็มระบบ', short: 'Admin' },
 ]
 
 const DEPT_LABEL: Record<Department, string> = {
@@ -23,6 +23,23 @@ const DEPT_LABEL: Record<Department, string> = {
   inspection: 'ตรวจสอบ',
   service: 'รถร่วม/บริการ',
   it: 'IT',
+}
+
+const DEPT_BADGE: Record<Department, string> = {
+  agri: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  sales: 'bg-sky-50 text-sky-700 border-sky-200',
+  stock: 'bg-amber-50 text-amber-700 border-amber-200',
+  accounting: 'bg-violet-50 text-violet-700 border-violet-200',
+  inspection: 'bg-orange-50 text-orange-700 border-orange-200',
+  service: 'bg-cyan-50 text-cyan-700 border-cyan-200',
+  it: 'bg-blue-50 text-blue-700 border-blue-200',
+}
+
+const LEVEL_BADGE: Record<string, string> = {
+  staff: 'bg-gray-50 text-gray-700 border-gray-200',
+  supervisor: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  manager: 'bg-purple-50 text-purple-700 border-purple-200',
+  admin: 'bg-red-50 text-red-700 border-red-200',
 }
 
 const PERMISSION_LABEL: Record<Permission, string> = {
@@ -118,6 +135,29 @@ function toggle<T extends string>(list: T[], item: T) {
   return list.includes(item) ? list.filter(v => v !== item) : [...list, item]
 }
 
+function sameList(a: string[] = [], b: string[] = []) {
+  const aa = [...a].sort().join('|')
+  const bb = [...b].sort().join('|')
+  return aa === bb
+}
+
+function isDirty(row: StaffRow, edit?: RowEdit) {
+  if (!edit) return false
+  const basePerms = row.permissions ?? []
+  const baseCaps = row.capabilities ?? []
+  return (
+    edit.department !== (row.department ?? 'agri') ||
+    edit.level !== (row.level ?? 'staff') ||
+    edit.can_fieldwork !== Boolean(row.can_fieldwork) ||
+    !sameList(edit.permissions, basePerms) ||
+    !sameList(edit.capabilities, baseCaps)
+  )
+}
+
+function Pill({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${className}`}>{children}</span>
+}
+
 export default function AdminStaff() {
   const [rows, setRows] = useState<StaffRow[]>([])
   const [edits, setEdits] = useState<Record<string, RowEdit>>({})
@@ -195,7 +235,8 @@ export default function AdminStaff() {
     const matchSearch = !q ||
       row.full_name.includes(q) ||
       row.phone.includes(q) ||
-      String(row.department ?? '').includes(q)
+      String(row.department ?? '').includes(q) ||
+      DEPT_LABEL[row.department ?? 'agri'].includes(q)
     const matchDept = filterDept === 'all' || row.department === filterDept
     const matchFieldwork = filterFieldwork === 'all' ||
       (filterFieldwork === 'yes' && row.can_fieldwork) ||
@@ -313,26 +354,28 @@ export default function AdminStaff() {
         </div>
         <div className="flex flex-wrap gap-2">
           <AdminQuickCreate mode="staff" onDone={load} />
-          <button onClick={load} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm hover:bg-gray-50 shadow-sm"><RefreshCw className="w-4 h-4"/>รีโหลด</button>
+          <button onClick={load} className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm hover:bg-gray-50 shadow-sm"><RefreshCw className="w-4 h-4"/>รีโหลด</button>
         </div>
       </div>
 
       {toast && <div className={`rounded-xl px-4 py-3 text-sm font-medium border ${toast.ok ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'bg-red-50 border-red-300 text-red-700'}`}>{toast.ok ? '✅' : '❌'} {toast.msg}</div>}
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-        <div className="relative md:col-span-2">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="ค้นหา ชื่อ/เบอร์/ฝ่าย" className="w-full pl-8 pr-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-emerald-500" />
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+          <div className="relative md:col-span-2">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="ค้นหา ชื่อ/เบอร์/ฝ่าย" className="w-full pl-8 pr-3 py-2 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-emerald-500" />
+          </div>
+          <select value={filterDept} onChange={e=>setFilterDept(e.target.value as 'all' | Department)} className="border-2 border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:border-emerald-500">
+            <option value="all">ทุกฝ่าย</option>
+            {departments.map(d => <option key={d} value={d}>{DEPT_LABEL[d]}</option>)}
+          </select>
+          <select value={filterFieldwork} onChange={e=>setFilterFieldwork(e.target.value as 'all' | 'yes' | 'no')} className="border-2 border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:border-emerald-500">
+            <option value="all">ทุกสิทธิ์ภาคสนาม</option>
+            <option value="yes">เปิดภาคสนาม</option>
+            <option value="no">ไม่เปิดภาคสนาม</option>
+          </select>
         </div>
-        <select value={filterDept} onChange={e=>setFilterDept(e.target.value as 'all' | Department)} className="border-2 border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:border-emerald-500">
-          <option value="all">ทุกฝ่าย</option>
-          {departments.map(d => <option key={d} value={d}>{DEPT_LABEL[d]}</option>)}
-        </select>
-        <select value={filterFieldwork} onChange={e=>setFilterFieldwork(e.target.value as 'all' | 'yes' | 'no')} className="border-2 border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:border-emerald-500">
-          <option value="all">ทุกสิทธิ์ภาคสนาม</option>
-          <option value="yes">เปิดภาคสนาม</option>
-          <option value="no">ไม่เปิดภาคสนาม</option>
-        </select>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -340,13 +383,13 @@ export default function AdminStaff() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b text-xs text-gray-500 uppercase tracking-wide font-semibold">
-                <th className="text-left px-4 py-3">ชื่อ</th>
-                <th className="text-left px-3 py-3">โทร</th>
-                <th className="text-center px-3 py-3">ฝ่าย</th>
-                <th className="text-center px-3 py-3">ระดับ</th>
-                <th className="text-center px-3 py-3">Capability</th>
-                <th className="text-center px-3 py-3">สิทธิ์</th>
-                <th className="text-center px-4 py-3">บันทึก</th>
+                <th className="text-left px-5 py-3">ชื่อ</th>
+                <th className="text-left px-4 py-3">โทร</th>
+                <th className="text-center px-4 py-3">ฝ่าย</th>
+                <th className="text-center px-4 py-3">ระดับ</th>
+                <th className="text-left px-4 py-3">Capability</th>
+                <th className="text-center px-4 py-3">สิทธิ์</th>
+                <th className="text-center px-5 py-3">จัดการ</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -358,68 +401,96 @@ export default function AdminStaff() {
                   permissions: row.permissions ?? [],
                   capabilities: row.capabilities ?? [],
                 }
+                const dirty = isDirty(row, edit)
                 const isA = acting === row.id
                 return (
                   <Fragment key={row.id}>
-                    <tr className="hover:bg-gray-50/60">
-                      <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">{row.full_name}</td>
-                      <td className="px-3 py-3 font-mono text-xs text-blue-600 whitespace-nowrap">{row.phone}</td>
-                      <td className="px-3 py-3 text-center">
-                        <select value={edit.department} onChange={e=>setEdit(row.id,{department:e.target.value as Department, permissions: DEPT_PERMISSIONS[e.target.value as Department] ?? []})} className="border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white">
-                          {departments.map(d => <option key={d} value={d}>{DEPT_LABEL[d]}</option>)}
-                        </select>
-                      </td>
-                      <td className="px-3 py-3 text-center">
-                        <select value={edit.level} onChange={e=>setEdit(row.id,{level:e.target.value})} className="border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white">
-                          {levels.map(l => <option key={l}>{l}</option>)}
-                        </select>
-                      </td>
-                      <td className="px-3 py-3 text-center min-w-52">
-                        <div className="grid grid-cols-1 gap-1 text-xs text-gray-600">
-                          <label className="flex items-center justify-center gap-1 cursor-pointer">
-                            <input type="checkbox" checked={edit.can_fieldwork} onChange={e=>setEdit(row.id,{can_fieldwork:e.currentTarget.checked})} /> ภาคสนาม
-                          </label>
-                          {CAPABILITY_OPTIONS.map(opt => (
-                            <label key={opt.value} className="flex items-center justify-center gap-1 cursor-pointer">
-                              <input type="checkbox" checked={edit.capabilities.includes(opt.value)} onChange={() => toggleCapability(row.id, opt.value)} /> {opt.label}
-                            </label>
-                          ))}
+                    <tr className="hover:bg-emerald-50/30 transition-colors">
+                      <td className="px-5 py-4 font-semibold text-gray-900 whitespace-nowrap">{row.full_name}</td>
+                      <td className="px-4 py-4 font-mono text-xs text-blue-600 whitespace-nowrap">{row.phone}</td>
+                      <td className="px-4 py-4 text-center">
+                        <div className="space-y-2">
+                          <Pill className={DEPT_BADGE[edit.department]}>{DEPT_LABEL[edit.department]}</Pill>
+                          <select value={edit.department} onChange={e=>setEdit(row.id,{department:e.target.value as Department, permissions: DEPT_PERMISSIONS[e.target.value as Department] ?? []})} className="block mx-auto border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:border-emerald-500">
+                            {departments.map(d => <option key={d} value={d}>{DEPT_LABEL[d]}</option>)}
+                          </select>
                         </div>
                       </td>
-                      <td className="px-3 py-3 text-center">
+                      <td className="px-4 py-4 text-center">
+                        <div className="space-y-2">
+                          <Pill className={LEVEL_BADGE[edit.level] ?? LEVEL_BADGE.staff}>{edit.level}</Pill>
+                          <select value={edit.level} onChange={e=>setEdit(row.id,{level:e.target.value})} className="block mx-auto border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:border-emerald-500">
+                            {levels.map(l => <option key={l}>{l}</option>)}
+                          </select>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 min-w-56">
+                        <div className="flex flex-wrap gap-1.5">
+                          {edit.can_fieldwork && <Pill className="bg-emerald-50 text-emerald-700 border-emerald-200">ภาคสนาม</Pill>}
+                          {CAPABILITY_OPTIONS.filter(opt => edit.capabilities.includes(opt.value)).map(opt => (
+                            <Pill key={opt.value} className="bg-blue-50 text-blue-700 border-blue-200">{opt.short}</Pill>
+                          ))}
+                          {!edit.can_fieldwork && edit.capabilities.length === 0 && <span className="text-xs text-gray-400">—</span>}
+                        </div>
+                        <button type="button" onClick={() => setExpanded(prev => ({ ...prev, [row.id]: !prev[row.id] }))} className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-800">
+                          <Settings2 className="w-3.5 h-3.5" /> แก้สิทธิ์/ความสามารถ
+                        </button>
+                      </td>
+                      <td className="px-4 py-4 text-center">
                         <button type="button" onClick={() => setExpanded(prev => ({ ...prev, [row.id]: !prev[row.id] }))} className="px-3 h-8 rounded-lg text-xs font-bold bg-gray-100 text-gray-700 hover:bg-gray-200">
                           {edit.permissions.includes('system.all') ? 'ทุกสิทธิ์' : `${edit.permissions.length} สิทธิ์`}
                         </button>
                       </td>
-                      <td className="px-4 py-3 text-center">
-                        <button disabled={isA} onClick={()=>save(row.id)} className={`px-3 h-8 rounded-lg text-xs font-bold ${isA ? 'bg-blue-100 text-blue-300' : 'bg-blue-500 text-white hover:bg-blue-600'}`}>{isA ? 'กำลังบันทึก...' : 'บันทึก'}</button>
+                      <td className="px-5 py-4 text-center">
+                        {dirty ? (
+                          <button disabled={isA} onClick={()=>save(row.id)} className={`px-3 h-8 rounded-lg text-xs font-bold ${isA ? 'bg-blue-100 text-blue-300' : 'bg-blue-500 text-white hover:bg-blue-600'}`}>{isA ? 'กำลังบันทึก...' : 'บันทึก'}</button>
+                        ) : (
+                          <span className="text-xs text-gray-400">บันทึกแล้ว</span>
+                        )}
                       </td>
                     </tr>
                     {expanded[row.id] && (
-                      <tr className="bg-gray-50/60">
-                        <td colSpan={7} className="px-4 py-4">
-                          <div className="flex items-center gap-2 mb-3">
-                            <button type="button" onClick={() => applyDeptDefault(row.id)} className="px-3 py-1.5 rounded-lg bg-white border text-xs font-semibold text-gray-700 hover:bg-gray-50">ใช้ค่าเริ่มต้นตามฝ่าย</button>
-                            <button type="button" onClick={() => setEdit(row.id, { permissions: [] })} className="px-3 py-1.5 rounded-lg bg-white border text-xs font-semibold text-red-600 hover:bg-red-50">ล้างสิทธิ์</button>
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-                            {PERMISSION_GROUPS.map(group => (
-                              <div key={group.title} className="bg-white rounded-xl border p-3">
-                                <div className="font-bold text-xs text-gray-700 mb-2">{group.title}</div>
-                                <div className="space-y-1.5">
-                                  {group.items.map(perm => (
-                                    <label key={perm} className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
-                                      <input
-                                        type="checkbox"
-                                        checked={hasPerm(edit.permissions, perm)}
-                                        onChange={e => togglePermission(row.id, perm, e.currentTarget.checked)}
-                                      />
-                                      <span>{PERMISSION_LABEL[perm]}</span>
-                                    </label>
-                                  ))}
-                                </div>
+                      <tr className="bg-gray-50/70">
+                        <td colSpan={7} className="px-5 py-4">
+                          <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4">
+                            <div className="bg-white rounded-xl border p-3">
+                              <div className="font-bold text-xs text-gray-700 mb-3">ความสามารถ</div>
+                              <div className="space-y-2">
+                                <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                                  <input type="checkbox" checked={edit.can_fieldwork} onChange={e=>setEdit(row.id,{can_fieldwork:e.currentTarget.checked})} /> ภาคสนาม
+                                </label>
+                                {CAPABILITY_OPTIONS.map(opt => (
+                                  <label key={opt.value} className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                                    <input type="checkbox" checked={edit.capabilities.includes(opt.value)} onChange={() => toggleCapability(row.id, opt.value)} /> {opt.label}
+                                  </label>
+                                ))}
                               </div>
-                            ))}
+                            </div>
+                            <div>
+                              <div className="flex flex-wrap items-center gap-2 mb-3">
+                                <button type="button" onClick={() => applyDeptDefault(row.id)} className="px-3 py-1.5 rounded-lg bg-white border text-xs font-semibold text-gray-700 hover:bg-gray-50">ใช้ค่าเริ่มต้นตามฝ่าย</button>
+                                <button type="button" onClick={() => setEdit(row.id, { permissions: [] })} className="px-3 py-1.5 rounded-lg bg-white border text-xs font-semibold text-red-600 hover:bg-red-50">ล้างสิทธิ์</button>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+                                {PERMISSION_GROUPS.map(group => (
+                                  <div key={group.title} className="bg-white rounded-xl border p-3">
+                                    <div className="font-bold text-xs text-gray-700 mb-2">{group.title}</div>
+                                    <div className="space-y-1.5">
+                                      {group.items.map(perm => (
+                                        <label key={perm} className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                                          <input
+                                            type="checkbox"
+                                            checked={hasPerm(edit.permissions, perm)}
+                                            onChange={e => togglePermission(row.id, perm, e.currentTarget.checked)}
+                                          />
+                                          <span>{PERMISSION_LABEL[perm]}</span>
+                                        </label>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
                           </div>
                         </td>
                       </tr>
@@ -427,7 +498,15 @@ export default function AdminStaff() {
                   </Fragment>
                 )
               })}
-              {filtered.length === 0 && <tr><td colSpan={7} className="text-center py-12 text-gray-400">ยังไม่มีพนักงาน</td></tr>}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="text-center py-16 text-gray-400">
+                    <div className="text-5xl mb-3">👥</div>
+                    <div className="font-semibold text-gray-600">{rows.length === 0 ? 'ยังไม่มีพนักงาน' : 'ไม่พบพนักงานตามเงื่อนไขค้นหา'}</div>
+                    <div className="text-xs mt-1">ลองเปลี่ยนคำค้นหา หรือปรับตัวกรองใหม่</div>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
