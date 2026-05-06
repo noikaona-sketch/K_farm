@@ -34,8 +34,7 @@ function titleOf(mode: Mode) {
   return 'เพิ่มพนักงาน'
 }
 
-function defaultCapability(mode: Mode): Capability[] {
-  if (mode === 'staff') return []
+function defaultCapability(_mode: Mode): Capability[] {
   return []
 }
 
@@ -48,6 +47,7 @@ export default function AdminQuickCreate({ mode, onDone }: { mode: Mode; onDone?
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
   const [idCard, setIdCard] = useState('')
+  const [email, setEmail] = useState('')
   const [address, setAddress] = useState('')
   const [province, setProvince] = useState('บุรีรัมย์')
   const [district, setDistrict] = useState('')
@@ -66,7 +66,7 @@ export default function AdminQuickCreate({ mode, onDone }: { mode: Mode; onDone?
   const [canFieldwork, setCanFieldwork] = useState(false)
 
   const reset = () => {
-    setFullName(''); setPhone(''); setIdCard(''); setAddress('')
+    setFullName(''); setPhone(''); setIdCard(''); setEmail(''); setAddress('')
     setProvince('บุรีรัมย์'); setDistrict(''); setSubdistrict(''); setVillage('')
     setGrade('C'); setCapabilities(defaultCapability(mode))
     setVehicleType('truck'); setVehicleSize('6 ล้อ'); setLicensePlate(''); setDriverName(''); setDriverPhone('')
@@ -80,6 +80,10 @@ export default function AdminQuickCreate({ mode, onDone }: { mode: Mode; onDone?
 
   const validate = () => {
     if (!fullName.trim()) throw new Error('กรุณากรอกชื่อ-นามสกุล')
+    if (mode === 'staff') {
+      if (!email.trim()) throw new Error('กรุณากรอก email สำหรับเข้าโปรแกรม')
+      return
+    }
     if (!phone.trim() && !idCard.trim()) throw new Error('กรุณากรอกเบอร์โทรหรือเลขบัตรอย่างน้อย 1 อย่าง')
     if (mode === 'vehicle' && !licensePlate.trim()) throw new Error('กรุณากรอกทะเบียนรถ')
   }
@@ -109,6 +113,7 @@ export default function AdminQuickCreate({ mode, onDone }: { mode: Mode; onDone?
           fullName,
           phone,
           idCard,
+          email,
           address,
           province,
           district,
@@ -130,11 +135,7 @@ export default function AdminQuickCreate({ mode, onDone }: { mode: Mode; onDone?
           fullName,
           phone,
           idCard,
-          address,
-          province,
-          district,
-          subdistrict,
-          village,
+          email,
           grade,
           capabilities,
           department,
@@ -167,7 +168,11 @@ export default function AdminQuickCreate({ mode, onDone }: { mode: Mode; onDone?
             <div className="sticky top-0 bg-white border-b px-5 py-4 flex items-center justify-between rounded-t-3xl">
               <div>
                 <h2 className="font-bold text-lg text-gray-900">{titleOf(mode)}</h2>
-                <p className="text-xs text-gray-500">ถ้าพบเลขบัตรหรือเบอร์ซ้ำ ระบบจะ update ข้อมูลเดิม</p>
+                <p className="text-xs text-gray-500">
+                  {mode === 'staff'
+                    ? 'พนักงานใช้ email สำหรับเข้าโปรแกรม รหัสผ่านสร้างผ่าน Supabase Auth/Invite'
+                    : 'ถ้าพบเลขบัตรหรือเบอร์ซ้ำ ระบบจะ update ข้อมูลเดิม'}
+                </p>
               </div>
               <button onClick={() => setOpen(false)} className="p-2 rounded-xl hover:bg-gray-100"><X className="w-5 h-5" /></button>
             </div>
@@ -179,21 +184,29 @@ export default function AdminQuickCreate({ mode, onDone }: { mode: Mode; onDone?
               <section className="grid md:grid-cols-2 gap-3">
                 <input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="ชื่อ-นามสกุล *" className="border rounded-xl p-3" />
                 <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="เบอร์โทร" className="border rounded-xl p-3" />
-                <input value={idCard} onChange={e => setIdCard(e.target.value)} placeholder="เลขบัตร / รหัส" className="border rounded-xl p-3" />
-                <select value={grade} onChange={e => setGrade(e.target.value as Grade)} className="border rounded-xl p-3 bg-white">
-                  {GRADES.map(g => <option key={g}>{g}</option>)}
-                </select>
+                {mode === 'staff' ? (
+                  <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email สำหรับเข้าโปรแกรม *" type="email" className="border rounded-xl p-3 md:col-span-2" />
+                ) : (
+                  <>
+                    <input value={idCard} onChange={e => setIdCard(e.target.value)} placeholder="เลขบัตร / รหัส" className="border rounded-xl p-3" />
+                    <select value={grade} onChange={e => setGrade(e.target.value as Grade)} className="border rounded-xl p-3 bg-white">
+                      {GRADES.map(g => <option key={g}>{g}</option>)}
+                    </select>
+                  </>
+                )}
               </section>
 
-              <section className="grid md:grid-cols-2 gap-3">
-                <select value={province} onChange={e => setProvince(e.target.value)} className="border rounded-xl p-3 bg-white">
-                  {PROVINCES.map(p => <option key={p}>{p}</option>)}
-                </select>
-                <input value={district} onChange={e => setDistrict(e.target.value)} placeholder="อำเภอ" className="border rounded-xl p-3" />
-                <input value={subdistrict} onChange={e => setSubdistrict(e.target.value)} placeholder="ตำบล" className="border rounded-xl p-3" />
-                <input value={village} onChange={e => setVillage(e.target.value)} placeholder="หมู่บ้าน" className="border rounded-xl p-3" />
-                <textarea value={address} onChange={e => setAddress(e.target.value)} placeholder="ที่อยู่เพิ่มเติม" className="border rounded-xl p-3 md:col-span-2" />
-              </section>
+              {mode !== 'staff' && (
+                <section className="grid md:grid-cols-2 gap-3">
+                  <select value={province} onChange={e => setProvince(e.target.value)} className="border rounded-xl p-3 bg-white">
+                    {PROVINCES.map(p => <option key={p}>{p}</option>)}
+                  </select>
+                  <input value={district} onChange={e => setDistrict(e.target.value)} placeholder="อำเภอ" className="border rounded-xl p-3" />
+                  <input value={subdistrict} onChange={e => setSubdistrict(e.target.value)} placeholder="ตำบล" className="border rounded-xl p-3" />
+                  <input value={village} onChange={e => setVillage(e.target.value)} placeholder="หมู่บ้าน" className="border rounded-xl p-3" />
+                  <textarea value={address} onChange={e => setAddress(e.target.value)} placeholder="ที่อยู่เพิ่มเติม" className="border rounded-xl p-3 md:col-span-2" />
+                </section>
+              )}
 
               {mode === 'vehicle' && (
                 <section className="grid md:grid-cols-2 gap-3 bg-orange-50 border border-orange-100 rounded-2xl p-4">
@@ -217,11 +230,17 @@ export default function AdminQuickCreate({ mode, onDone }: { mode: Mode; onDone?
                   <select value={department} onChange={e => setDepartment(e.target.value as Department)} className="border rounded-xl p-3 bg-white">
                     {DEPARTMENTS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
                   </select>
+                  <select value={grade} onChange={e => setGrade(e.target.value as Grade)} className="border rounded-xl p-3 bg-white">
+                    {GRADES.map(g => <option key={g}>{g}</option>)}
+                  </select>
                   <label className="flex items-center gap-2 text-sm text-gray-700">
                     <input type="checkbox" checked={canFieldwork} onChange={e => setCanFieldwork(e.currentTarget.checked)} /> เปิดงานภาคสนาม
                   </label>
                   <label className="flex items-center gap-2 text-sm text-gray-700">
                     <input type="checkbox" checked={capabilities.includes('can_inspect')} onChange={() => toggleCapability('can_inspect')} /> ผู้ตรวจทั่วไป
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input type="checkbox" checked={capabilities.includes('can_inspect_no_burn')} onChange={() => toggleCapability('can_inspect_no_burn')} /> ตรวจไม่เผา
                   </label>
                   <label className="flex items-center gap-2 text-sm text-gray-700">
                     <input type="checkbox" checked={capabilities.includes('manage_all')} onChange={() => toggleCapability('manage_all')} /> Admin เต็มระบบ
