@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 import { RefreshCw, Search, UserCog, Wifi, WifiOff } from 'lucide-react'
 import { supabase, isSupabaseReady } from '../../lib/supabase'
 import { DEPT_PERMISSIONS, type Permission } from '../../lib/permissions'
+import AdminQuickCreate from './AdminQuickCreate'
 
 type Department = 'agri' | 'sales' | 'stock' | 'accounting' | 'inspection' | 'service' | 'it'
 
@@ -267,7 +268,10 @@ export default function AdminStaff() {
             <span className="text-gray-400">• เฉพาะ staff • {rows.length} รายการ</span>
           </div>
         </div>
-        <button onClick={load} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm hover:bg-gray-50 shadow-sm"><RefreshCw className="w-4 h-4"/>รีโหลด</button>
+        <div className="flex flex-wrap gap-2">
+          <AdminQuickCreate mode="staff" onDone={load} />
+          <button onClick={load} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm hover:bg-gray-50 shadow-sm"><RefreshCw className="w-4 h-4"/>รีโหลด</button>
+        </div>
       </div>
 
       {toast && <div className={`rounded-xl px-4 py-3 text-sm font-medium border ${toast.ok ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'bg-red-50 border-red-300 text-red-700'}`}>{toast.ok ? '✅' : '❌'} {toast.msg}</div>}
