@@ -62,10 +62,11 @@ interface AuthCtx {
 }
 
 const LS_KEY = 'kfarm_user'
+const VALID_CAPABILITIES: Capability[] = ['is_leader', 'can_inspect', 'can_inspect_no_burn', 'manage_all']
 
 function normalizeCapabilities(value: unknown): Capability[] {
   if (!Array.isArray(value)) return []
-  return value.filter((v): v is Capability => v === 'is_leader' || v === 'can_inspect')
+  return value.filter((v): v is Capability => VALID_CAPABILITIES.includes(v as Capability))
 }
 
 function normalizeUser(u: AuthUser): AuthUser {
