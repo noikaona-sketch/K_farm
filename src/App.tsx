@@ -54,6 +54,7 @@ import AdminFieldInspections from './app/admin/AdminFieldInspections'
 import AdminReports          from './app/admin/AdminReports'
 import AdminStaff            from './app/admin/AdminStaff'
 import AdminNoBurnApplications from './app/admin/AdminNoBurnApplications'
+import AdminInspectionFinalReview from './app/admin/AdminInspectionFinalReview'
 
 const ROLE_HOME: Record<AppRole, string> = {
   member:    '/farmer',
@@ -192,6 +193,7 @@ export default function App() {
             <Route path="service-providers" element={<AdminServiceProviders />} />
             <Route path="field-inspections" element={<AdminFieldInspections />} />
             <Route path="no-burn"           element={<AdminNoBurnApplications />} />
+            <Route path="inspection-final-review" element={<AdminInspectionFinalReview />} />
             <Route path="reports"           element={<AdminReports />} />
             <Route path="farmers"           element={<AdminFarmers />} />
             <Route path="map"               element={<AdminMap />} />
