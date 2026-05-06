@@ -6,12 +6,12 @@
  *
  * New model:
  *   baseType: farmer | service | staff
- *   capabilities: is_leader, can_inspect
+ *   capabilities: is_leader, can_inspect, can_inspect_no_burn, manage_all
  */
 
 export type AppRole = 'member' | 'farmer' | 'field' | 'leader' | 'inspector' | 'admin' | 'vehicle' | 'service'
 export type BaseType = 'farmer' | 'service' | 'staff'
-export type Capability = 'is_leader' | 'can_inspect'
+export type Capability = 'is_leader' | 'can_inspect' | 'can_inspect_no_burn' | 'manage_all'
 export type VehicleType = 'tractor' | 'harvester' | 'truck'
 export type Grade = 'A' | 'B' | 'C'
 
@@ -46,9 +46,10 @@ export function isBaseType(baseType: BaseType | undefined, target: BaseType): bo
 }
 
 export function deriveRoleFromIdentity(baseType?: BaseType, capabilities: Capability[] = [], fallbackRole: AppRole = 'member'): AppRole {
-  if (fallbackRole === 'admin') return 'admin'
+  if (fallbackRole === 'admin' || hasCapability(capabilities, 'manage_all')) return 'admin'
   if (hasCapability(capabilities, 'is_leader')) return 'leader'
   if (hasCapability(capabilities, 'can_inspect')) return 'inspector'
+  if (hasCapability(capabilities, 'can_inspect_no_burn')) return 'inspector'
   if (baseType === 'service') return 'vehicle'
   if (baseType === 'staff') return 'field'
   if (baseType === 'farmer') return 'farmer'
@@ -65,10 +66,11 @@ export type Feature =
   | 'field_work'     // งานภาคสนาม
   | 'leader_approve' // อนุมัติแปลง / สมาชิก
   | 'inspection'     // ตรวจสอบแปลง
+  | 'no_burn_inspection'
   | 'admin_panel'    // admin dashboard
   | 'service_work'   // งานรถร่วม
 
-const FEATURE_REQUIRED: Record<Feature, AppRole> = {
+const FEATURE_REQUIRED: Record<Exclude<Feature, 'no_burn_inspection'>, AppRole> = {
   register:       'member',
   status:         'member',
   profile:        'member',
@@ -83,6 +85,7 @@ const FEATURE_REQUIRED: Record<Feature, AppRole> = {
 
 export function canAccess(userRole: AppRole | undefined, feature: Feature): boolean {
   if (!userRole) return false
+  if (feature === 'no_burn_inspection') return atLeast(userRole, 'inspector')
   return atLeast(userRole, FEATURE_REQUIRED[feature])
 }
 
@@ -91,8 +94,10 @@ export function canAccessByIdentity(
   identity: { role?: AppRole; baseType?: BaseType; capabilities?: Capability[]; canFieldwork?: boolean },
 ): boolean {
   const role = deriveRoleFromIdentity(identity.baseType, identity.capabilities ?? [], identity.role ?? 'member')
+  if (hasCapability(identity.capabilities, 'manage_all') || role === 'admin') return true
   if (feature === 'field_work' && identity.baseType === 'staff' && identity.canFieldwork) return true
   if (feature === 'inspection') return hasCapability(identity.capabilities, 'can_inspect') || role === 'admin'
+  if (feature === 'no_burn_inspection') return hasCapability(identity.capabilities, 'can_inspect') || hasCapability(identity.capabilities, 'can_inspect_no_burn') || role === 'admin'
   if (feature === 'leader_approve') return hasCapability(identity.capabilities, 'is_leader') || role === 'admin'
   if (feature === 'service_work') return identity.baseType === 'service' || role === 'admin'
   if (feature === 'farming') return identity.baseType === 'farmer' || role === 'admin'
@@ -125,6 +130,7 @@ export const ROLE_TABS: Record<AppRole, readonly { to: string; label: string; ic
   field: [
     { to: '/field', label: 'งานสนาม', icon: '📋', end: true },
     { to: '/field/seed-booking', label: 'จองเมล็ด', icon: '🌾', end: false },
+    { to: '/field/farms/add', label: 'บันทึกแปลง', icon: '📍', end: false },
     { to: '/field/farm-inspection', label: 'ตรวจแปลง', icon: '🔍', end: false },
     { to: '/field/no-burn', label: 'ไม่เผา', icon: '🚫', end: false },
   ],
@@ -156,10 +162,18 @@ export function getTabsForIdentity(identity: { role?: AppRole; baseType?: BaseTy
     if (hasCapability(identity.capabilities, 'can_inspect')) {
       tabs.push({ to: '/inspector', label: 'งานตรวจ', icon: '🔍', end: false })
     }
+    if (hasCapability(identity.capabilities, 'can_inspect_no_burn')) {
+      tabs.push({ to: '/inspector', label: 'ตรวจไม่เผา', icon: '🚫', end: false })
+    }
   }
 
-  if (identity.baseType === 'service' && hasCapability(identity.capabilities, 'is_leader')) {
-    tabs.push({ to: '/service/team', label: 'ทีมรถ', icon: '👥', end: false })
+  if (identity.baseType === 'service') {
+    if (hasCapability(identity.capabilities, 'is_leader')) {
+      tabs.push({ to: '/service/team', label: 'ทีมรถ', icon: '👥', end: false })
+    }
+    if (hasCapability(identity.capabilities, 'can_inspect_no_burn')) {
+      tabs.push({ to: '/inspector', label: 'ตรวจไม่เผา', icon: '🚫', end: false })
+    }
   }
 
   if (identity.baseType === 'staff' && identity.canFieldwork) {
@@ -184,6 +198,7 @@ export const ROLE_HOME: Record<AppRole, string> = {
 export function getHomeForIdentity(identity: { role?: AppRole; baseType?: BaseType; capabilities?: Capability[]; canFieldwork?: boolean }) {
   const role = deriveRoleFromIdentity(identity.baseType, identity.capabilities ?? [], identity.role ?? 'member')
   if (identity.role === 'admin') return '/admin'
+  if (identity.baseType === 'service' && hasCapability(identity.capabilities, 'can_inspect_no_burn')) return '/inspector'
   if (identity.baseType === 'service') return '/service'
   if (identity.baseType === 'staff') return identity.canFieldwork ? '/field' : ROLE_HOME[role]
   return ROLE_HOME[role]
