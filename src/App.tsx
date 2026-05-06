@@ -27,6 +27,7 @@ import MemberTier         from './app/farmer/MemberTier'
 import RegisterPage       from './app/farmer/RegisterPage'
 import RegistrationStatus from './app/farmer/RegistrationStatus'
 import SeedVarieties      from './app/farmer/SeedVarieties'
+import NoBurnApplication  from './app/farmer/NoBurnApplication'
 
 // Leader
 import LeaderDashboard  from './app/leader/LeaderDashboard'
@@ -52,6 +53,7 @@ import AdminServiceProviders from './app/admin/AdminServiceProviders'
 import AdminFieldInspections from './app/admin/AdminFieldInspections'
 import AdminReports          from './app/admin/AdminReports'
 import AdminStaff            from './app/admin/AdminStaff'
+import AdminNoBurnApplications from './app/admin/AdminNoBurnApplications'
 
 const ROLE_HOME: Record<AppRole, string> = {
   member:    '/farmer',
@@ -153,6 +155,7 @@ export default function App() {
             <Route path="seeds"    element={<SeedVarieties />} />
             <Route path="prices"   element={<PriceAnnouncement />} />
             <Route path="tier"     element={<MemberTier />} />
+            <Route path="no-burn"  element={<RequireAuth minRole="farmer"><NoBurnApplication /></RequireAuth>} />
             <Route path="pin"       element={<RequireAuth minRole="farmer"><PinFarm /></RequireAuth>} />
             <Route path="farms"     element={<RequireAuth minRole="farmer"><MyFarms /></RequireAuth>} />
             <Route path="farms/add" element={<RequireAuth minRole="farmer"><AddFarm /></RequireAuth>} />
@@ -188,6 +191,7 @@ export default function App() {
             <Route path="seed-sales"        element={<AdminSeedSales />} />
             <Route path="service-providers" element={<AdminServiceProviders />} />
             <Route path="field-inspections" element={<AdminFieldInspections />} />
+            <Route path="no-burn"           element={<AdminNoBurnApplications />} />
             <Route path="reports"           element={<AdminReports />} />
             <Route path="farmers"           element={<AdminFarmers />} />
             <Route path="map"               element={<AdminMap />} />
