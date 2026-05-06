@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { RefreshCw, Search, Truck, Wifi, WifiOff } from 'lucide-react'
 import { supabase, isSupabaseReady } from '../../lib/supabase'
+import AdminQuickCreate from './AdminQuickCreate'
 
 type VehicleType = 'tractor' | 'harvester' | 'truck'
 type Grade = 'A' | 'B' | 'C'
@@ -59,11 +60,6 @@ function asVehicleType(value: unknown): VehicleType {
 
 function asGrade(value: unknown): Grade {
   return value === 'A' || value === 'B' ? value : 'C'
-}
-
-function getVehicleSize(row: Record<string, unknown>) {
-  const ocr = row.id_card_ocr_json as Record<string, unknown> | null | undefined
-  return String(row.vehicle_size ?? ocr?.vehicle_size ?? ocr?.vehicle_type ?? '') || '6 ล้อ'
 }
 
 function readProfile(row: Record<string, unknown>) {
@@ -254,7 +250,10 @@ export default function AdminServiceProviders() {
             <span className="text-gray-400">• เฉพาะ service • {total} รายการ</span>
           </div>
         </div>
-        <button onClick={load} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm hover:bg-gray-50 shadow-sm"><RefreshCw className="w-4 h-4"/>รีโหลด</button>
+        <div className="flex flex-wrap gap-2">
+          <AdminQuickCreate mode="vehicle" onDone={load} />
+          <button onClick={load} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm hover:bg-gray-50 shadow-sm"><RefreshCw className="w-4 h-4"/>รีโหลด</button>
+        </div>
       </div>
 
       {toast && <div className={`rounded-xl px-4 py-3 text-sm font-medium border ${toast.ok ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'bg-red-50 border-red-300 text-red-700'}`}>{toast.ok ? '✅' : '❌'} {toast.msg}</div>}
