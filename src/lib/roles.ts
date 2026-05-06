@@ -106,13 +106,11 @@ export function canAccessByIdentity(
 export const ROLE_TABS: Record<AppRole, readonly { to: string; label: string; icon: string; end: boolean }[]> = {
   member: [
     { to: '/farmer', label: 'หน้าแรก', icon: '🏠', end: true },
-    { to: '/farmer/seeds', label: 'จองเมล็ด', icon: '🌾', end: false },
     { to: '/farmer/status', label: 'สถานะ', icon: '📋', end: false },
     { to: '/farmer/register', label: 'ข้อมูล', icon: '👤', end: false },
   ],
   farmer: [
     { to: '/farmer', label: 'หน้าแรก', icon: '🏠', end: true },
-    { to: '/farmer/seeds', label: 'จองเมล็ด', icon: '🌾', end: false },
     { to: '/farmer/planting', label: 'แจ้งปลูก', icon: '🌽', end: false },
     { to: '/farmer/no-burn', label: 'ไม่เผา', icon: '🚫', end: false },
     { to: '/farmer/status', label: 'สถานะ', icon: '📋', end: false },
@@ -130,7 +128,7 @@ export const ROLE_TABS: Record<AppRole, readonly { to: string; label: string; ic
   ],
   field: [
     { to: '/field', label: 'งานสนาม', icon: '📋', end: true },
-    { to: '/farmer/seeds', label: 'จองเมล็ด', icon: '🌾', end: false },
+    { to: '/field/seed-booking', label: 'จองเมล็ด', icon: '🌾', end: false },
     { to: '/field/farms/add', label: 'บันทึกแปลง', icon: '📍', end: false },
     { to: '/field/farm-inspection', label: 'ตรวจแปลง', icon: '🔍', end: false },
     { to: '/field/no-burn', label: 'ไม่เผา', icon: '🚫', end: false },
@@ -138,8 +136,7 @@ export const ROLE_TABS: Record<AppRole, readonly { to: string; label: string; ic
   leader: [
     { to: '/leader', label: 'หน้าแรก', icon: '🏠', end: true },
     { to: '/leader/confirm', label: 'อนุมัติ', icon: '✅', end: false },
-    { to: '/farmer/seeds', label: 'จองเมล็ด', icon: '🌾', end: false },
-    { to: '/leader/bookings', label: 'รายการจองทีม', icon: '📋', end: false },
+    { to: '/leader/bookings', label: 'จองเมล็ด', icon: '🌾', end: false },
   ],
   inspector: [
     { to: '/inspector', label: 'งานของฉัน', icon: '📋', end: true },
@@ -161,7 +158,6 @@ export function getTabsForIdentity(identity: { role?: AppRole; baseType?: BaseTy
 
   if (identity.baseType === 'farmer') {
     if (hasCapability(capabilities, 'is_leader')) tabs.push({ to: '/leader/confirm', label: 'อนุมัติ', icon: '✅', end: false })
-    if (hasCapability(capabilities, 'is_leader')) tabs.push({ to: '/leader/bookings', label: 'รายการจองทีม', icon: '📋', end: false })
     if (hasCapability(capabilities, 'can_inspect')) tabs.push({ to: '/inspector', label: 'งานตรวจ', icon: '🔍', end: false })
     if (hasCapability(capabilities, 'can_inspect_no_burn')) tabs.push({ to: '/inspector', label: 'ตรวจไม่เผา', icon: '🚫', end: false })
   }
@@ -173,7 +169,6 @@ export function getTabsForIdentity(identity: { role?: AppRole; baseType?: BaseTy
 
   if (identity.baseType === 'staff' && identity.canFieldwork) {
     tabs.push({ to: '/field', label: 'ภาคสนาม', icon: '📋', end: false })
-    tabs.push({ to: '/farmer/seeds', label: 'จองเมล็ด', icon: '🌾', end: false })
   }
 
   return tabs.filter((tab, idx, arr) => arr.findIndex(t => t.to === tab.to) === idx)
