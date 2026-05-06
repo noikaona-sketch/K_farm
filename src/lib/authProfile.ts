@@ -3,6 +3,28 @@ import type { AuthUser, RegStatus } from '../routes/AuthContext'
 import type { AppRole, BaseType, Capability, Grade, VehicleType } from './roles'
 import type { Department, Permission } from './permissions'
 
+type QueryResult<T> = {
+  data: T | null
+  error: { message: string } | null
+}
+
+type AuthResult = {
+  data: {
+    user: { id: string } | null
+    session?: unknown
+  }
+  error: { message: string } | null
+}
+
+type SessionResult = {
+  data: {
+    session: {
+      user: { id: string }
+    } | null
+  }
+  error: { message: string } | null
+}
+
 function normalizeArray<T extends string>(value: unknown): T[] {
   if (!Array.isArray(value)) return []
   return value.filter((v): v is T => typeof v === 'string')
@@ -22,9 +44,9 @@ function asGrade(value: unknown): Grade | undefined {
   return value === 'A' || value === 'B' || value === 'C' ? value : undefined
 }
 
-function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+function withTimeout<T>(promiseLike: PromiseLike<T>, ms: number, message: string): Promise<T> {
   return Promise.race([
-    promise,
+    Promise.resolve(promiseLike),
     new Promise<T>((_, reject) => {
       window.setTimeout(() => reject(new Error(message)), ms)
     }),
@@ -63,7 +85,7 @@ export async function getProfileByAuthUserId(authUserId: string) {
     .from('profiles')
     .select('*')
     .eq('auth_user_id', authUserId)
-    .maybeSingle()
+    .maybeSingle() as unknown as PromiseLike<QueryResult<Record<string, unknown>>>
 
   const { data, error } = await withTimeout(
     query,
@@ -72,13 +94,14 @@ export async function getProfileByAuthUserId(authUserId: string) {
   )
 
   if (error) throw new Error(error.message)
-  return data ? mapProfileToAuthUser(data as Record<string, unknown>) : null
+  return data ? mapProfileToAuthUser(data) : null
 }
 
 export async function signInAdminWithPassword(email: string, password: string) {
   const db = requireSupabase()
+  const authRequest = db.auth.signInWithPassword({ email, password }) as unknown as PromiseLike<AuthResult>
   const { data, error } = await withTimeout(
-    db.auth.signInWithPassword({ email, password }),
+    authRequest,
     12000,
     'เข้าสู่ระบบ Supabase Auth ไม่สำเร็จภายในเวลาที่กำหนด',
   )
@@ -97,8 +120,9 @@ export async function signInAdminWithPassword(email: string, password: string) {
 
 export async function getCurrentAuthProfile() {
   if (!supabase) return null
+  const sessionRequest = supabase.auth.getSession() as unknown as PromiseLike<SessionResult>
   const { data, error } = await withTimeout(
-    supabase.auth.getSession(),
+    sessionRequest,
     12000,
     'โหลด session ไม่สำเร็จภายในเวลาที่กำหนด',
   )
