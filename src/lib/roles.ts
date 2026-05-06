@@ -111,6 +111,7 @@ export const ROLE_TABS: Record<AppRole, readonly { to: string; label: string; ic
   ],
   farmer: [
     { to: '/farmer', label: 'หน้าแรก', icon: '🏠', end: true },
+    { to: '/farmer/seeds', label: 'จองเมล็ด', icon: '🌾', end: false },
     { to: '/farmer/planting', label: 'แจ้งปลูก', icon: '🌽', end: false },
     { to: '/farmer/no-burn', label: 'ไม่เผา', icon: '🚫', end: false },
     { to: '/farmer/status', label: 'สถานะ', icon: '📋', end: false },
