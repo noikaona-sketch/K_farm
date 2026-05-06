@@ -13,6 +13,7 @@ import {
 import type { Department, Permission } from '../lib/permissions'
 import { hasPermission as _hasPerm, getAllowedMenus, DEPT_PERMISSIONS } from '../lib/permissions'
 import type { AdminMenuItem } from '../lib/permissions'
+import { signOutSupabase } from '../lib/authProfile'
 
 export type { AppRole, BaseType, Capability, Grade, VehicleType }
 export type RegStatus = 'pending_leader' | 'pending_admin' | 'approved' | 'rejected' | 'none'
@@ -32,15 +33,11 @@ export interface AuthUser {
   bankAccountNo?: string
   bankAccountName?: string
   registrationStatus: RegStatus
-
-  // New identity model
   baseType?: BaseType
   capabilities?: Capability[]
   grade?: Grade
   vehicleType?: VehicleType
   canFieldwork?: boolean
-
-  // Permission system
   department?: Department
   permissions?: Permission[]
 }
@@ -102,11 +99,6 @@ function loadStored(): AuthUser | null {
   } catch { return null }
 }
 
-/** Resolve permissions for a user:
- *  1. Use explicit permissions[] if set in DB
- *  2. Fall back to department defaults
- *  3. If role=admin with no department → system.all
- */
 function resolvePermissions(u: AuthUser): Permission[] {
   if (u.permissions && u.permissions.length > 0) return u.permissions
   if (u.department) return DEPT_PERMISSIONS[u.department] ?? []
@@ -132,7 +124,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const normalized = normalizeUser(u)
     setUser(normalized); persist(normalized)
   }
-  const logout = () => { setUser(null); persist(null) }
+  const logout = () => {
+    setUser(null)
+    persist(null)
+    void signOutSupabase()
+  }
 
   const setRegStatus = (s: RegStatus) => {
     setUser(prev => {
