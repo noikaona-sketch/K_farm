@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react'
+import React, { createContext, useContext, useEffect, useState } from 'react'
 import type { AppRole, BaseType, Capability, Feature, Grade, VehicleType } from '../lib/roles'
 import {
   canAccess as _canAccess,
@@ -13,7 +13,8 @@ import {
 import type { Department, Permission } from '../lib/permissions'
 import { hasPermission as _hasPerm, getAllowedMenus, DEPT_PERMISSIONS } from '../lib/permissions'
 import type { AdminMenuItem } from '../lib/permissions'
-import { signOutSupabase } from '../lib/authProfile'
+import { getProfileByAuthUserId, signOutSupabase } from '../lib/authProfile'
+import { supabase } from '../lib/supabase'
 
 export type { AppRole, BaseType, Capability, Grade, VehicleType }
 export type RegStatus = 'pending_leader' | 'pending_admin' | 'approved' | 'rejected' | 'none'
@@ -122,26 +123,78 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = (u: AuthUser) => {
     const normalized = normalizeUser(u)
-    setUser(normalized); persist(normalized)
+    setUser(normalized)
+    persist(normalized)
   }
+
   const logout = () => {
     setUser(null)
     persist(null)
     void signOutSupabase()
   }
 
+  useEffect(() => {
+    if (!supabase) return
+    let isMounted = true
+
+    const syncSession = async () => {
+      try {
+        const { data } = await supabase.auth.getSession()
+        const authUser = data.session?.user
+        if (!authUser) return
+        const profile = await getProfileByAuthUserId(authUser.id)
+        if (profile && isMounted) {
+          const normalized = normalizeUser(profile)
+          setUser(normalized)
+          persist(normalized)
+        }
+      } catch (err) {
+        console.warn('[AuthContext] session sync failed:', err)
+      }
+    }
+
+    void syncSession()
+
+    const { data: subscription } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT' || !session?.user) {
+        setUser(null)
+        persist(null)
+        return
+      }
+
+      try {
+        const profile = await getProfileByAuthUserId(session.user.id)
+        if (profile) {
+          const normalized = normalizeUser(profile)
+          setUser(normalized)
+          persist(normalized)
+        }
+      } catch (err) {
+        console.warn('[AuthContext] auth state profile load failed:', err)
+      }
+    })
+
+    return () => {
+      isMounted = false
+      subscription.subscription.unsubscribe()
+    }
+  }, [])
+
   const setRegStatus = (s: RegStatus) => {
     setUser(prev => {
       if (!prev) return prev
       const next = normalizeUser({ ...prev, registrationStatus: s })
-      persist(next); return next
+      persist(next)
+      return next
     })
   }
+
   const updateUser = (partial: Partial<AuthUser>) => {
     setUser(prev => {
       if (!prev) return prev
       const next = normalizeUser({ ...prev, ...partial })
-      persist(next); return next
+      persist(next)
+      return next
     })
   }
 
