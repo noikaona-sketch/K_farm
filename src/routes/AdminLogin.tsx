@@ -1,86 +1,41 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, RefreshCw, AlertCircle } from 'lucide-react'
 import { useAuth } from './AuthContext'
 import logoImage from '../assets/logo.png'
+import { signInAdminWithPassword } from '../lib/authProfile'
 import type { AppRole } from '../lib/roles'
-import type { Department, Permission } from '../lib/permissions'
 
-type StaffAccount = {
-  code: string 
-  password: string
-  name: string
-  role: AppRole
-  department?: Department
-  permissions?: Permission[]
+function routeForRole(role: AppRole) {
+  if (role === 'admin') return '/admin'
+  if (role === 'field') return '/field'
+  if (role === 'leader') return '/leader'
+  if (role === 'service' || role === 'vehicle') return '/service'
+  return '/inspector'
 }
-
-// Mock admin credentials — in production replace with Supabase auth
-const STAFF_ACCOUNTS: StaffAccount[] = [
-  {
-    code: 'AD001',
-    password: 'admin',
-    name: 'ผู้ดูแลระบบ',
-    role: 'admin',
-    department: 'it',
-    permissions: ['system.all'],
-  },
-  {
-    code: 'FD001',
-    password: '2222',
-    name: 'เจ้าหน้าที่ภาคสนาม',
-    role: 'field',
-    department: 'agri',
-    permissions: ['field.view','field.member_register', 'field.seed_booking', 'field.farm_inspection', 'field.no_burn'],
-  },
-  {
-    code: 'LD001',
-    password: '5678',
-    name: 'ประสิทธิ์ นำทาง',
-    role: 'leader',
-  },
-  {
-    code: 'IN001',
-    password: '9012',
-    name: 'วิภา ตรวจการ',
-    role: 'inspector',
-  },
-]
 
 export default function AdminLogin() {
   const navigate = useNavigate()
   const { login } = useAuth()
-  const [code, setCode] = useState('')
-  const [pw, setPw] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
-  const handleLogin = () => {
-    setLoading(true); setErr(null)
-    setTimeout(() => {
-      const acc = STAFF_ACCOUNTS.find(a => a.code === code.toUpperCase() && a.password === pw)
-      if (acc) {
-        login({
-      id: acc.code,
-      profileId: acc.code,
-      name: acc.name,
-      role: acc.role,
-      code: acc.code,
-      phone: '',
-      idCard: '',
-      registrationStatus: 'approved',
-      department: acc.department,
-      permissions: acc.permissions,
-      })
-        if (acc.role === 'admin') navigate('/admin', { replace: true })
-        else if (acc.role === 'field') navigate('/field', { replace: true })
-        else if (acc.role === 'leader') navigate('/leader', { replace: true })
-        else navigate('/inspector', { replace: true })
-      } else {
-        setErr('รหัสผู้ใช้หรือรหัสผ่านไม่ถูกต้อง')
-        setLoading(false)
-      }
-    }, 600)
+  const handleLogin = async () => {
+    setLoading(true)
+    setErr(null)
+    try {
+      if (!email.trim()) throw new Error('กรุณากรอก Email')
+      if (!password) throw new Error('กรุณากรอกรหัสผ่าน')
+      const user = await signInAdminWithPassword(email.trim(), password)
+      login(user)
+      navigate(routeForRole(user.role), { replace: true })
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'เข้าสู่ระบบไม่สำเร็จ')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -102,10 +57,8 @@ export default function AdminLogin() {
         </div>
         <div className="p-6 space-y-4">
           <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-500 space-y-0.5">
-            <p>Admin: AD001 / admin</p>
-            <p>Field: FD001 / 2222</p>
-            <p>Leader: LD001 / 5678</p>
-            <p>Inspector: IN001 / 9012</p>
+            <p className="font-bold text-gray-700">ใช้ Email + Password จาก Supabase Auth</p>
+            <p>ต้องผูกบัญชีไว้ใน profiles.auth_user_id ก่อนเข้าใช้งาน</p>
           </div>
           {err && (
             <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex gap-2 items-center">
@@ -114,21 +67,32 @@ export default function AdminLogin() {
             </div>
           )}
           <div>
-            <label className="text-xs font-bold text-gray-600 block mb-1.5">รหัสผู้ใช้</label>
-            <input value={code} onChange={e => { setCode(e.target.value); setErr(null) }}
-              placeholder="AD001 / FD001 / LD001 / IN001"
-              className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-gray-500 uppercase"
-              onKeyDown={e => e.key === 'Enter' && handleLogin()} />
+            <label className="text-xs font-bold text-gray-600 block mb-1.5">Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={e => { setEmail(e.target.value); setErr(null) }}
+              placeholder="admin@example.com"
+              className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-gray-500"
+              onKeyDown={e => e.key === 'Enter' && handleLogin()}
+            />
           </div>
           <div>
             <label className="text-xs font-bold text-gray-600 block mb-1.5">รหัสผ่าน</label>
-            <input type="password" value={pw} onChange={e => { setPw(e.target.value); setErr(null) }}
+            <input
+              type="password"
+              value={password}
+              onChange={e => { setPassword(e.target.value); setErr(null) }}
               placeholder="รหัสผ่าน"
               className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-gray-500"
-              onKeyDown={e => e.key === 'Enter' && handleLogin()} />
+              onKeyDown={e => e.key === 'Enter' && handleLogin()}
+            />
           </div>
-          <button onClick={handleLogin} disabled={loading}
-            className={`w-full bg-gray-800 text-white py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 ${loading ? 'opacity-70' : 'hover:bg-gray-700'} transition-colors`}>
+          <button
+            onClick={handleLogin}
+            disabled={loading}
+            className={`w-full bg-gray-800 text-white py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 ${loading ? 'opacity-70' : 'hover:bg-gray-700'} transition-colors`}
+          >
             {loading ? <><RefreshCw className="w-4 h-4 animate-spin" />กำลังเข้าสู่ระบบ...</> : 'เข้าสู่ระบบ'}
           </button>
         </div>
